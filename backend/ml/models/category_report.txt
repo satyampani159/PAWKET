@@ -1,0 +1,16 @@
+              precision    recall  f1-score   support
+
+   education       1.00      1.00      1.00         1
+         emi       0.93      0.99      0.96       420
+        food       1.00      0.93      0.96       350
+      health       1.00      0.79      0.88        14
+  investment       0.99      0.97      0.98       154
+      others       0.97      0.99      0.98      4252
+    shopping       0.94      0.92      0.93       185
+    transfer       0.91      0.99      0.95       152
+   transport       0.93      0.76      0.84        71
+   utilities       1.00      0.96      0.98      1834
+
+    accuracy                           0.98      7433
+   macro avg       0.97      0.93      0.95      7433
+weighted avg       0.98      0.98      0.98      7433
