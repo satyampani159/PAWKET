@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+venv/
+mobile/node_modules/
+mobile/.expo/
+backend/finance.db
+ml_pipeline/data/
+.DS_Store
+Thumbs.db
