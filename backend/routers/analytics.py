@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import extract, func
 from datetime import datetime
@@ -15,7 +15,7 @@ def analytics_endpoint(month: str = Query(default=None), user: User = Depends(re
     try:
         datetime.strptime(month, "%Y-%m")
     except ValueError:
-        return {"error": "Invalid month format. Use YYYY-MM"}
+        raise HTTPException(status_code=400, detail="Invalid month format. Use YYYY-MM")
     return get_monthly_analytics(db, month, user.id)
 
 @router.get("/months")
@@ -36,7 +36,8 @@ def get_transactions(month: str = Query(default=None), category: str = Query(def
             year, mon = int(month.split("-")[0]), int(month.split("-")[1])
             query = query.filter(extract("year", Transaction.received_at)==year,
                 extract("month", Transaction.received_at)==mon)
-        except: pass
+        except (ValueError, IndexError):
+            pass
     if category:
         query = query.filter(Transaction.final_category==category)
     total = query.count()

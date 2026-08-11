@@ -9,12 +9,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import extract, func
 from datetime import datetime, date
 from collections import defaultdict
-import json
 
 from database.database import Transaction
 
 
-def get_monthly_analytics(db: Session, month: str) -> dict:
+def get_monthly_analytics(db: Session, month: str, user_id: int) -> dict:
     """
     month: "2024-05"
     Returns full analytics dict for that month.
@@ -23,6 +22,7 @@ def get_monthly_analytics(db: Session, month: str) -> dict:
 
     # Fetch all transactions for the month
     txns = db.query(Transaction).filter(
+        Transaction.user_id == user_id,
         extract("year",  Transaction.received_at) == year,
         extract("month", Transaction.received_at) == mon,
     ).all()
@@ -96,11 +96,15 @@ def get_monthly_analytics(db: Session, month: str) -> dict:
     # Daily trend
     daily = defaultdict(float)
     daily_cat = defaultdict(str)
+    daily_cat_amount = defaultdict(float)
     for t in debits:
         if t.received_at:
             day = t.received_at.strftime("%Y-%m-%d")
             daily[day] += t.amount
-            daily_cat[day] = t.final_category or "others"
+            cat = t.final_category or "others"
+            if t.amount > daily_cat_amount.get(day, 0):
+                daily_cat[day] = cat
+                daily_cat_amount[day] = t.amount
 
     daily_trend = [
         {"date": d, "amount": round(amt, 2), "category": daily_cat[d]}

@@ -152,6 +152,21 @@ CATEGORY_RULES = [
             r"\bdelivery\b", r"\bshipment\b",
         ],
     ),
+    # ---- Utilities & Bills (before health — telecom keywords are unambiguous) ----
+    (
+        "utilities",
+        [
+            r"\belectricity\b", r"\bwater bill\b", r"\bgas bill\b",
+            r"\bbroadband\b", r"\bwifi\b", r"\binternet\b", r"\bcable tv\b",
+            r"\bdth\b", r"\btata sky\b", r"\bdish tv\b", r"\bairtel\b",
+            r"\bjio\b", r"\bvi\b.{0,10}\brecharge\b", r"\bbsnl\b",
+            r"\bmobile recharge\b", r"\bpostpaid\b", r"\bpostpaid bill\b",
+            r"\bprepaid\b", r"\bprepaid recharge\b",
+            r"\bnetflix\b", r"\bprime\b", r"\bhotstar\b", r"\bspotify\b",
+            r"\bott\b", r"\bsubscription\b",
+            r"\bbill paid\b", r"\bbill payment\b",
+        ],
+    ),
     # ---- Health & Medical ----
     (
         "health",
@@ -199,21 +214,6 @@ CATEGORY_RULES = [
             r"\bpaytm\b.{0,40}\bsent\b",
             r"\bsent rs\b", r"\bpaid rs\b.{0,30}\bto\b",
             r"\bp2p\b",
-        ],
-    ),
-    # ---- Utilities & Bills ----
-    (
-        "utilities",
-        [
-            r"\belectricity\b", r"\bwater bill\b", r"\bgas bill\b",
-            r"\bbroadband\b", r"\bwifi\b", r"\binternet\b", r"\bcable tv\b",
-            r"\bdth\b", r"\btata sky\b", r"\bdish tv\b", r"\bairtel\b",
-            r"\bjio\b", r"\bvi\b.{0,10}\brecharge\b", r"\bbsnl\b",
-            r"\bmobile recharge\b", r"\bpostpaid\b", r"\bpostpaid bill\b",
-            r"\bprepaid\b", r"\bprepaid recharge\b",
-            r"\bnetflix\b", r"\bprime\b", r"\bhotstar\b", r"\bspotify\b",
-            r"\bott\b", r"\bsubscription\b",
-            r"\bbill paid\b", r"\bbill payment\b",
         ],
     ),
     # ---- Education ----

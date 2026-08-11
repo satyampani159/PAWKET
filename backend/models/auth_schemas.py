@@ -26,5 +26,4 @@ class UserProfile(BaseModel):
     transaction_count: int
 
 class SyncStatusUpdate(BaseModel):
-    user_id:      int
     synced_count: int

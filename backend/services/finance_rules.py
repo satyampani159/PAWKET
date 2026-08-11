@@ -20,8 +20,8 @@ from typing import Optional
 # "needs" = essential, "wants" = lifestyle, "savings" = investment/savings
 # ---------------------------------------------------------------------------
 
-NEEDS_CATEGORIES  = {"emi", "utilities", "health", "transport", "education"}
-WANTS_CATEGORIES  = {"food", "shopping", "daily_expense", "transfer"}
+NEEDS_CATEGORIES  = {"emi", "utilities", "health", "transport", "education", "transfer"}
+WANTS_CATEGORIES  = {"food", "shopping"}
 SAVING_CATEGORIES = {"investment"}
 
 
@@ -40,7 +40,6 @@ CATEGORY_BUDGET_PERCENT = {
     "utilities":     0.08,
     "education":     0.05,
     "transfer":      0.05,
-    "daily_expense": 0.05,
     "others":        0.05,
 }
 
@@ -122,7 +121,6 @@ def detect_recurring(transactions: list[dict]) -> list[dict]:
     Returns list of detected recurring payments with suggested category.
     """
     from collections import defaultdict
-    import math
 
     # Group by merchant first, then by rounded amount
     merchant_groups = defaultdict(list)
@@ -187,6 +185,8 @@ def generate_insights(
     transaction_count: int,
     recurring: list[dict],
     correction_rate: float,
+    user_name: Optional[str] = None,
+    user_goal: Optional[str] = None,
 ) -> list[dict]:
     insights = []
 

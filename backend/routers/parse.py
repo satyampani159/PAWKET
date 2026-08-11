@@ -13,48 +13,53 @@ from routers.auth import require_auth
 router = APIRouter(prefix="/parse", tags=["parse"])
 
 
-def _process_one(text, sms_id, received_at, user_id, db):
+def _process_one(text, sms_id, received_at, sender, user_id, db):
     """Shared logic for single and batch parse."""
-    text = text.strip()
-    if not text:
-        return "empty", None
+    try:
+        text = text.strip()
+        if not text:
+            return "empty", None
 
-    is_financial, _ = ml_models.predict_filter(text)
-    if not is_financial:
-        return "ignored", None
+        is_financial, _ = ml_models.predict_filter(text)
+        if not is_financial:
+            return "ignored", None
 
-    parsed   = parse_sms(text)
-    received = received_at or parsed.get("received_at") or datetime.utcnow()
-    amount   = parsed.get("amount")
-    txn_type = parsed.get("transaction_type", "debit")
+        parsed   = parse_sms(text)
+        received = received_at or parsed.get("received_at") or datetime.utcnow()
+        amount   = parsed.get("amount")
+        txn_type = parsed.get("transaction_type", "debit")
 
-    # Smart deduplication — catches UPI app + bank SMS duplicates
-    if is_duplicate(db, user_id, amount, txn_type, received, sms_id, text):
-        return "duplicate", None
+        # Smart deduplication — catches UPI app + bank SMS duplicates
+        if is_duplicate(db, user_id, amount, txn_type, received, sms_id, text):
+            return "duplicate", None
 
-    cat = categorize(
-        text=text, amount=amount,
-        received_at=received, merchant=parsed.get("merchant"),
-    )
+        cat = categorize(
+            text=text, amount=amount,
+            received_at=received, merchant=parsed.get("merchant"),
+        )
 
-    txn = Transaction(
-        user_id            = user_id,
-        sms_id             = sms_id,
-        raw_text           = text,
-        amount             = amount,
-        merchant           = parsed.get("merchant"),
-        bank               = parsed.get("bank"),
-        transaction_type   = txn_type,
-        received_at        = received,
-        predicted_category = cat["predicted_category"],
-        ml_confidence      = cat["confidence"],
-        all_scores         = json.dumps(cat["all_scores"]),
-        pattern_category   = cat["pattern_category"],
-        final_category     = cat["final_category"],
-        is_corrected       = False,
-    )
-    db.add(txn)
-    return "parsed", txn
+        txn = Transaction(
+            user_id            = user_id,
+            sms_id             = sms_id,
+            raw_text           = text,
+            amount             = amount,
+            merchant           = parsed.get("merchant"),
+            bank               = parsed.get("bank"),
+            sender             = sender,
+            transaction_type   = txn_type,
+            received_at        = received,
+            predicted_category = cat["predicted_category"],
+            ml_confidence      = cat["confidence"],
+            all_scores         = json.dumps(cat["all_scores"]),
+            pattern_category   = cat["pattern_category"],
+            final_category     = cat["final_category"],
+            is_corrected       = False,
+        )
+        db.add(txn)
+        return "parsed", txn
+    except Exception as e:
+        print(f"[PARSE] Error processing SMS: {e}")
+        return "error", None
 
 
 @router.post("", response_model=ParseResponse)
@@ -63,7 +68,7 @@ def parse_endpoint(req: ParseRequest, user: User = Depends(require_auth), db: Se
         raise HTTPException(status_code=503, detail="ML models not loaded.")
 
     status, txn = _process_one(
-        req.text, req.sms_id, req.received_at, user.id, db
+        req.text, req.sms_id, req.received_at, req.sender, user.id, db
     )
 
     if status == "empty":
@@ -83,37 +88,42 @@ def parse_endpoint(req: ParseRequest, user: User = Depends(require_auth), db: Se
     db.commit()
     db.refresh(txn)
 
-    parsed = parse_sms(req.text)
-    cat    = categorize(text=req.text, amount=txn.amount, received_at=txn.received_at, merchant=txn.merchant)
+    from models.schemas import get_confidence_tier
+    tier = get_confidence_tier(txn.ml_confidence) if txn.ml_confidence is not None else None
 
     return ParseResponse(
         status="parsed", sms_id=req.sms_id, transaction_id=txn.id,
         amount=txn.amount, merchant=txn.merchant,
         transaction_type=txn.transaction_type, received_at=txn.received_at,
-        bank=txn.bank, predicted_category=cat["predicted_category"],
-        confidence=cat["confidence"], confidence_tier=cat["confidence_tier"],
-        all_scores=cat["all_scores"], pattern_category=cat["pattern_category"],
-        final_category=cat["final_category"], message=None,
+        bank=txn.bank, predicted_category=txn.predicted_category,
+        confidence=txn.ml_confidence, confidence_tier=tier,
+        all_scores=json.loads(txn.all_scores) if txn.all_scores else None,
+        pattern_category=txn.pattern_category,
+        final_category=txn.final_category, message=None,
     )
 
 
 @router.post("/batch")
 def parse_batch(req: list[ParseRequest], user: User = Depends(require_auth), db: Session = Depends(get_db)):
+    if not ml_models.loaded:
+        raise HTTPException(status_code=503, detail="ML models not loaded.")
     if len(req) > 500:
         raise HTTPException(status_code=400, detail="Max 500 messages per batch.")
 
-    parsed_count = ignored_count = duplicate_count = 0
+    parsed_count = ignored_count = duplicate_count = error_count = 0
 
     for item in req:
         status, _ = _process_one(
-            item.text, item.sms_id, item.received_at, user.id, db
+            item.text, item.sms_id, item.received_at, item.sender, user.id, db
         )
         if status == "parsed":
             parsed_count += 1
-        elif status == "ignored" or status == "empty":
+        elif status in ("ignored", "empty"):
             ignored_count += 1
         elif status == "duplicate":
             duplicate_count += 1
+        elif status == "error":
+            error_count += 1
 
     db.commit()
 
@@ -121,6 +131,7 @@ def parse_batch(req: list[ParseRequest], user: User = Depends(require_auth), db:
         "parsed":     parsed_count,
         "ignored":    ignored_count,
         "duplicates": duplicate_count,
+        "errors":     error_count,
         "total":      len(req),
     }
 

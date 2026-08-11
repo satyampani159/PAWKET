@@ -3,7 +3,7 @@ name = "pawket-backend"
 primary_region = "bom"  # Mumbai — closest to India
 
 [build]
-  builder = "paketobuildpacks/builder:base"
+  dockerfile = "backend/Dockerfile"
 
 [env]
   ML_MODELS_DIR = "ml/models"

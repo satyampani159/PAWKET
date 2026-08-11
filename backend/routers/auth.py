@@ -1,7 +1,6 @@
 import random
 import secrets
 from datetime import datetime, timedelta
-from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from database.database import get_db, User, OTPRecord, Session as SessionModel

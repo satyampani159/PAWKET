@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+.env
+.git
+.gitignore
+*.db
+*.pkl
+ml_pipeline/
+node_modules/
+.DS_Store

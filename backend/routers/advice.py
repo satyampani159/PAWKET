@@ -26,7 +26,10 @@ def advice_endpoint(month: str = Query(default=None), income: float = Query(defa
 
     analytics = get_monthly_analytics(db, month, user.id)
     if not analytics.get("transactions"):
-        return {"month": month, "message": "No transactions found for this month."}
+        return {"month": month, "message": "No transactions found for this month.",
+                "budget_rule": None, "category_budgets": [], "insights": [],
+                "recurring_detected": [], "estimated_income": 0, "greeting": "",
+                "user_profile": {"name": None, "gender": None, "age": None, "financial_goal": None}}
 
     transactions    = analytics["transactions"]
     category_totals = analytics.get("category_totals", {})
@@ -45,11 +48,12 @@ def advice_endpoint(month: str = Query(default=None), income: float = Query(defa
     goal_tip = GOAL_TIPS.get(user.financial_goal, "") if user.financial_goal else ""
 
     # Generate insights with user context
+    recurring = detect_recurring(transactions)
     insights = generate_insights(
         category_totals   = category_totals,
         estimated_income  = estimated_income,
         transaction_count = kpis.get("transaction_count", 0),
-        recurring         = detect_recurring(transactions),
+        recurring         = recurring,
         correction_rate   = kpis.get("correction_rate", 0),
         user_name         = name,
         user_goal         = user.financial_goal,
@@ -71,7 +75,7 @@ def advice_endpoint(month: str = Query(default=None), income: float = Query(defa
         "budget_rule":      analyze_5030_20(category_totals, estimated_income),
         "category_budgets": compute_category_budgets(category_totals, estimated_income),
         "insights":         insights,
-        "recurring_detected": detect_recurring(transactions),
+        "recurring_detected": recurring,
         "user_profile": {
             "name":           user.name,
             "gender":         user.gender,

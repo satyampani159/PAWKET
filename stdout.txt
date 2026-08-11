@@ -1,0 +1,9 @@
+
+[startup] Creating database tables...
+[DB] Tables created / verified.
+[startup] Loading ML models...
+[ML] Loading filter model from   D:\project\PAWKET\backend\ml\models\filter_model.pkl
+[ML] Loading category model from D:\project\PAWKET\backend\ml\models\category_model.pkl
+[ML] Both models loaded successfully.
+[startup] Ready.
+

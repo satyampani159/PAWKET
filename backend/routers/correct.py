@@ -6,7 +6,7 @@ from models.schemas import CorrectRequest, CorrectResponse
 from routers.auth import require_auth
 
 router = APIRouter(prefix="/correct", tags=["correct"])
-VALID_CATEGORIES = {"food","transport","shopping","health","emi","investment","transfer","utilities","education","daily_expense","others"}
+VALID_CATEGORIES = {"food","transport","shopping","health","emi","investment","transfer","utilities","education","others"}
 
 @router.patch("", response_model=CorrectResponse)
 def correct_category(req: CorrectRequest, user: User = Depends(require_auth), db: Session = Depends(get_db)):
@@ -29,4 +29,4 @@ def list_categories():
         "food":"🍕 Food & Dining","transport":"🚗 Transport","shopping":"🛒 Shopping",
         "health":"🏥 Health","emi":"🏦 EMI & Loans","investment":"📈 Investment",
         "transfer":"👥 Transfers","utilities":"💡 Utilities & Bills",
-        "education":"📚 Education","daily_expense":"☕ Daily Expenses","others":"📦 Others"}}
+        "education":"📚 Education","others":"📦 Others"}}

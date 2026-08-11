@@ -2,9 +2,11 @@ from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
+from pathlib import Path
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./finance.db")
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'finance.db'}")
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -53,6 +55,7 @@ class Transaction(Base):
     amount                  = Column(Float, nullable=True)
     merchant                = Column(String, nullable=True)
     bank                    = Column(String, nullable=True)
+    sender                  = Column(String, nullable=True)
     transaction_type        = Column(String, nullable=True)
     received_at             = Column(DateTime, nullable=True)
     created_at              = Column(DateTime, default=datetime.utcnow)

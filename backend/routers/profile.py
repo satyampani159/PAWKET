@@ -83,7 +83,7 @@ def get_profile(user: User = Depends(require_auth), db: Session = Depends(get_db
         profile_photo  = user.profile_photo,
         monthly_income = user.monthly_income,
         transaction_count = count,
-        member_since   = user.created_at.strftime("%b %Y"),
+        member_since   = user.created_at.strftime("%b %Y") if user.created_at else "Unknown",
         goal_advice    = goal_advice,
     )
 

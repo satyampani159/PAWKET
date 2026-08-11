@@ -36,6 +36,7 @@ class ParseRequest(BaseModel):
     text: str = Field(..., description="Raw SMS text from the phone")
     sms_id: Optional[str] = Field(None, description="Unique SMS ID from phone")
     received_at: Optional[datetime] = Field(None, description="When SMS was received")
+    sender: Optional[str] = Field(None, description="Sender address/number from phone")
 
 
 class ParseResponse(BaseModel):

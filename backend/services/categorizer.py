@@ -32,8 +32,6 @@ AMOUNT_RULES = [
     (10,   200,  11, 15, "food",          "midday small payment"),
     # Small evening spend → food (tea/snacks/dinner)
     (10,   300,  18, 23, "food",          "evening small payment"),
-    # Very small any time → daily expense (cigarette, biscuit, etc.)
-    (1,    99,   0,  23, "daily_expense", "micro transaction"),
     # Medium any time → shopping
     (100,  500,  0,  23, "shopping",      "medium transaction"),
     # Large → likely EMI or rent
@@ -64,12 +62,19 @@ def pattern_engine(
     """
     t = text.lower()
 
-    # 1. Sender/merchant keyword match (fast path)
+    # 1. Merchant name match (most reliable signal)
+    if merchant:
+        m = merchant.lower()
+        for pattern, category in SENDER_CATEGORY_MAP.items():
+            if re.search(pattern, m):
+                return category
+
+    # 2. Sender/keyword match in full text (fast path)
     for pattern, category in SENDER_CATEGORY_MAP.items():
         if re.search(pattern, t):
             return category
 
-    # 2. Amount + time-of-day rules
+    # 3. Amount + time-of-day rules
     if amount is not None:
         hour = received_at.hour if received_at else 13  # default midday
 

@@ -1,10 +1,14 @@
 __pycache__/
 *.pyc
+*.pkl
 .env
 venv/
 mobile/node_modules/
 mobile/.expo/
 backend/finance.db
 ml_pipeline/data/
+ml_pipeline/models/
+backend/ml/models/
+*.apk
 .DS_Store
 Thumbs.db
