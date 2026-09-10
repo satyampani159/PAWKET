@@ -24,7 +24,14 @@ def advice_endpoint(month: str = Query(default=None), income: float = Query(defa
     if not month:
         month = datetime.utcnow().strftime("%Y-%m")
 
-    analytics = get_monthly_analytics(db, month, user.id)
+    try:
+        analytics = get_monthly_analytics(db, month, user.id)
+    except Exception as e:
+        import traceback
+        print(f"[ADVICE ERROR in get_monthly_analytics] {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Analytics error: {e}")
+
     if not analytics.get("transactions"):
         return {"month": month, "message": "No transactions found for this month.",
                 "budget_rule": None, "category_budgets": [], "insights": [],

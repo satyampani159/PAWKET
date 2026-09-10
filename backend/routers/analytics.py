@@ -16,7 +16,13 @@ def analytics_endpoint(month: str = Query(default=None), user: User = Depends(re
         datetime.strptime(month, "%Y-%m")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid month format. Use YYYY-MM")
-    return get_monthly_analytics(db, month, user.id)
+    try:
+        return get_monthly_analytics(db, month, user.id)
+    except Exception as e:
+        import traceback
+        print(f"[ANALYTICS ERROR] {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/months")
 def available_months(user: User = Depends(require_auth), db: Session = Depends(get_db)):
