@@ -29,6 +29,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[startup] WARNING: ML models failed to load: {e}")
         print("[startup] Running without ML — parse endpoints will return 503.")
+    print("[startup] Auto-seeding test data if empty...")
+    try:
+        from services.auto_seed import auto_seed
+        auto_seed()
+    except Exception as e:
+        print(f"[startup] Auto-seed skipped: {e}")
     print("[startup] Ready.\n")
     yield
 
