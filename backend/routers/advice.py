@@ -56,6 +56,14 @@ def advice_endpoint(month: str = Query(default=None), income: float = Query(defa
 
     # Generate insights with user context
     recurring = detect_recurring(transactions)
+
+    # Get previous month's KPIs for comparison
+    year, mon = int(month.split("-")[0]), int(month.split("-")[1])
+    prev_month_dt = datetime(year, mon - 1, 1) if mon > 1 else datetime(year - 1, 12, 1)
+    prev_month_str = prev_month_dt.strftime("%Y-%m")
+    prev_analytics = get_monthly_analytics(db, prev_month_str, user.id)
+    months_data = [prev_analytics, {"kpis": kpis}] if prev_analytics.get("kpis") else [{"kpis": kpis}]
+
     insights = generate_insights(
         category_totals   = category_totals,
         estimated_income  = estimated_income,
@@ -64,6 +72,9 @@ def advice_endpoint(month: str = Query(default=None), income: float = Query(defa
         correction_rate   = kpis.get("correction_rate", 0),
         user_name         = name,
         user_goal         = user.financial_goal,
+        transactions      = transactions,
+        kpis              = kpis,
+        months_data       = months_data,
     )
 
     # Add goal-specific insight at the top

@@ -13,6 +13,8 @@ Rules implemented:
 """
 
 from typing import Optional
+from collections import defaultdict
+from datetime import datetime
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +122,6 @@ def detect_recurring(transactions: list[dict]) -> list[dict]:
     Groups transactions by (merchant or amount) and detects monthly patterns.
     Returns list of detected recurring payments with suggested category.
     """
-    from collections import defaultdict
 
     # Group by merchant first, then by rounded amount
     merchant_groups = defaultdict(list)
@@ -187,8 +188,18 @@ def generate_insights(
     correction_rate: float,
     user_name: Optional[str] = None,
     user_goal: Optional[str] = None,
+    transactions: Optional[list[dict]] = None,
+    kpis: Optional[dict] = None,
+    months_data: Optional[list[dict]] = None,
 ) -> list[dict]:
     insights = []
+
+    if transactions is None:
+        transactions = []
+    if kpis is None:
+        kpis = {}
+    if months_data is None:
+        months_data = []
 
     total_spend = sum(category_totals.values())
 
@@ -261,6 +272,105 @@ def generate_insights(
                        "it improves future predictions.",
             "category": None,
         })
+
+    # 7. Month-over-month spending change
+    if len(months_data) >= 2:
+        current_total = kpis.get("total_spend", 0)
+        prev_month = months_data[-2] if len(months_data) > 1 else None
+        if prev_month and prev_month.get("kpis", {}).get("total_spend", 0) > 0:
+            prev_total = prev_month["kpis"]["total_spend"]
+            change_pct = ((current_total - prev_total) / prev_total) * 100
+            if abs(change_pct) > 10:
+                direction = "increased" if change_pct > 0 else "decreased"
+                insights.append({
+                    "type": "warning" if change_pct > 0 else "tip",
+                    "title": f"Spending {direction.title()}",
+                    "message": f"Your spending {direction} by {abs(change_pct):.0f}% compared to last month (₹{prev_total:,.0f} → ₹{current_total:,.0f}).",
+                    "category": None,
+                })
+
+    # 8. Top merchant concentration
+    if transactions:
+        merchant_totals = defaultdict(float)
+        for t in transactions:
+            if t.get("transaction_type") == "debit" and t.get("merchant"):
+                merchant_totals[t["merchant"]] += t.get("amount", 0)
+        if merchant_totals:
+            total_spend_kpi = kpis.get("total_spend", 1)
+            top_3 = sorted(merchant_totals.items(), key=lambda x: -x[1])[:3]
+            top_3_total = sum(amt for _, amt in top_3)
+            top_3_pct = (top_3_total / total_spend_kpi * 100) if total_spend_kpi else 0
+            if top_3_pct > 40:
+                names = ", ".join(m for m, _ in top_3)
+                insights.append({
+                    "type": "tip",
+                    "title": "High Merchant Concentration",
+                    "message": f"Your top 3 merchants ({names}) account for {top_3_pct:.0f}% of your spending. Consider diversifying.",
+                    "category": None,
+                })
+
+    # 9. Weekend vs weekday spending
+    weekday_spend = 0
+    weekend_spend = 0
+    weekday_count = 0
+    weekend_count = 0
+    for t in transactions:
+        if t.get("transaction_type") == "debit" and t.get("received_at"):
+            try:
+                dt = datetime.fromisoformat(t["received_at"])
+                if dt.weekday() >= 5:  # Saturday or Sunday
+                    weekend_spend += t.get("amount", 0)
+                    weekend_count += 1
+                else:
+                    weekday_spend += t.get("amount", 0)
+                    weekday_count += 1
+            except (ValueError, TypeError):
+                pass
+    if weekday_count > 0 and weekend_count > 0:
+        weekday_avg = weekday_spend / weekday_count
+        weekend_avg = weekend_spend / weekend_count
+        if weekend_avg > weekday_avg * 1.3:
+            insights.append({
+                "type": "tip",
+                "title": "Weekend Spending Spike",
+                "message": f"You spend ₹{weekend_avg:,.0f} per transaction on weekends vs ₹{weekday_avg:,.0f} on weekdays. That's {((weekend_avg/weekday_avg - 1)*100):.0f}% more.",
+                "category": None,
+            })
+
+    # 10. Savings rate based on income
+    if estimated_income and estimated_income > 0:
+        spend = kpis.get("total_spend", 0)
+        savings = estimated_income - spend
+        savings_rate = (savings / estimated_income) * 100
+        if savings_rate < 10 and spend > 0:
+            insights.append({
+                "type": "warning",
+                "title": "Low Savings Rate",
+                "message": f"You're saving only {savings_rate:.0f}% of your income (₹{savings:,.0f} of ₹{estimated_income:,.0f}). Aim for at least 20%.",
+                "category": None,
+            })
+        elif savings_rate >= 20:
+            insights.append({
+                "type": "achievement",
+                "title": "Great Savings Rate",
+                "message": f"You're saving {savings_rate:.0f}% of your income this month. Keep it up!",
+                "category": None,
+            })
+
+    # 11. Single category dominance
+    if category_totals:
+        total_spend_main = kpis.get("total_spend", 1) or sum(category_totals.values()) or 1
+        for cat, amt in category_totals.items():
+            pct = (amt / total_spend_main * 100) if total_spend_main else 0
+            if pct > 40 and cat != "emi":  # EMI is expected to be large
+                cat_label = cat.replace("_", " ").title()
+                insights.append({
+                    "type": "warning",
+                    "title": f"High {cat_label} Spending",
+                    "message": f"{cat_label} accounts for {pct:.0f}% of your total spend (₹{amt:,.0f}). Consider setting a budget for this category.",
+                    "category": cat,
+                })
+                break  # Only show one dominance warning
 
     return insights
 

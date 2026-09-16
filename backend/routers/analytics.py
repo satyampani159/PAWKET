@@ -55,3 +55,20 @@ def get_transactions(month: str = Query(default=None), category: str = Query(def
          "final_category": t.final_category, "predicted_category": t.predicted_category,
          "confidence": t.ml_confidence, "is_corrected": t.is_corrected,
          "user_corrected_category": t.user_corrected_category} for t in txns]}
+
+@router.get("/compare")
+def compare_months(months: str = Query(default=None, description="Comma-separated months, e.g. 2026-09,2026-08,2026-07"),
+    user: User = Depends(require_auth), db: Session = Depends(get_db)):
+    if not months:
+        return {"error": "Provide months query param"}
+    month_list = [m.strip() for m in months.split(",") if m.strip()]
+    if not month_list:
+        raise HTTPException(status_code=400, detail="No valid months provided")
+    try:
+        from services.analytics import get_multi_month_analytics
+        return get_multi_month_analytics(db, month_list, user.id)
+    except Exception as e:
+        import traceback
+        print(f"[COMPARE ERROR] {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))

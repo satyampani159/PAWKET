@@ -144,3 +144,44 @@ def get_monthly_analytics(db: Session, month: str, user_id: int) -> dict:
         "category_totals":    dict(category_totals),
         "transactions":       txn_list,
     }
+
+
+def get_multi_month_analytics(db: Session, months: list[str], user_id: int) -> dict:
+    """
+    Returns category breakdown and totals for multiple months.
+    months: ["2026-09", "2026-08", "2026-07"]
+    """
+    results = {}
+    for month in months:
+        year, mon = int(month.split("-")[0]), int(month.split("-")[1])
+        txns = db.query(Transaction).filter(
+            Transaction.user_id == user_id,
+            extract("year", Transaction.received_at) == year,
+            extract("month", Transaction.received_at) == mon,
+        ).all()
+        
+        debits = [t for t in txns if t.transaction_type == "debit" and t.amount]
+        credits = [t for t in txns if t.transaction_type == "credit" and t.amount]
+        total_spend = sum(t.amount for t in debits)
+        total_credit = sum(t.amount for t in credits)
+        
+        category_totals = defaultdict(float)
+        for t in debits:
+            cat = t.final_category or "others"
+            category_totals[cat] += t.amount
+        
+        category_breakdown = [
+            {"category": cat, "total": round(total, 2),
+             "percentage": round(total / total_spend * 100, 1) if total_spend else 0}
+            for cat, total in sorted(category_totals.items(), key=lambda x: -x[1])
+        ]
+        
+        results[month] = {
+            "total_spend": round(total_spend, 2),
+            "total_credit": round(total_credit, 2),
+            "net": round(total_credit - total_spend, 2),
+            "transaction_count": len(txns),
+            "category_breakdown": category_breakdown,
+        }
+    
+    return {"months": results}
