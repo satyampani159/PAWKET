@@ -71,13 +71,25 @@ def health():
 
 
 @app.post("/admin/reset", tags=["admin"])
-def admin_reset():
-    """Drop all tables, recreate them, and re-seed with fresh test data."""
+def admin_reset(seed: bool = True):
+    """Drop all tables, recreate them. Optionally re-seed with auto_seed data."""
     print("[ADMIN] Dropping all tables...")
     Base.metadata.drop_all(bind=engine)
     print("[ADMIN] Recreating tables...")
     Base.metadata.create_all(bind=engine)
-    print("[ADMIN] Re-seeding test data...")
-    from services.auto_seed import auto_seed
-    auto_seed()
-    return {"status": "reset", "message": "All data cleared. 50 transactions seeded for +917377044562."}
+    if seed:
+        print("[ADMIN] Re-seeding test data...")
+        from services.auto_seed import auto_seed
+        auto_seed()
+        return {"status": "reset", "message": "All data cleared. 68 transactions seeded for +917377044562."}
+    return {"status": "reset", "message": "All data cleared. No seed data added."}
+
+
+@app.post("/admin/drop", tags=["admin"])
+def admin_drop():
+    """Drop all tables and recreate empty — no seed data. For use with test_seed.py."""
+    print("[ADMIN] Dropping all tables...")
+    Base.metadata.drop_all(bind=engine)
+    print("[ADMIN] Recreating empty tables...")
+    Base.metadata.create_all(bind=engine)
+    return {"status": "dropped", "message": "All data cleared. Empty DB ready for test_seed.py."}
