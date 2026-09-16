@@ -10,7 +10,7 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 
-from database.database import create_tables, SessionLocal
+from database.database import create_tables, SessionLocal, Base, engine
 from ml.ml_loader import ml_models
 from routers.auth import router as auth_router
 from routers.parse import router as parse_router
@@ -68,3 +68,16 @@ def health():
     except Exception:
         pass
     return {"status": "ok", "ml_loaded": ml_models.loaded, "db_ok": db_ok}
+
+
+@app.post("/admin/reset", tags=["admin"])
+def admin_reset():
+    """Drop all tables, recreate them, and re-seed with fresh test data."""
+    print("[ADMIN] Dropping all tables...")
+    Base.metadata.drop_all(bind=engine)
+    print("[ADMIN] Recreating tables...")
+    Base.metadata.create_all(bind=engine)
+    print("[ADMIN] Re-seeding test data...")
+    from services.auto_seed import auto_seed
+    auto_seed()
+    return {"status": "reset", "message": "All data cleared. 50 transactions seeded for +917377044562."}
