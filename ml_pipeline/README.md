@@ -1,6 +1,8 @@
 # ml_pipeline
 
-Train the two ML models that power the finance app.
+Train the two ML models that power the PAWKET finance app.
+
+Models use TF-IDF + SGDClassifier (scikit-learn) trained on ~100K Indian SMS messages.
 
 ## Folder structure
 

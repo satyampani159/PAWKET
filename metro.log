@@ -1,0 +1,15 @@
+npm notice run pawket@1.0.0 npx
+npm notice run expo start
+Starting project at D:\project\PAWKET\mobile
+Starting Metro Bundler
+The following packages should be updated for best compatibility with the installed expo version:
+  @expo/config-plugins@56.0.8 - expected version: ~54.0.4
+  expo@54.0.34 - expected version: ~54.0.37
+  expo-font@13.0.4 - expected version: ~14.0.12
+  expo-sms@12.0.1 - expected version: ~14.0.8
+  babel-preset-expo@13.0.0 - expected version: ~54.0.10
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+
+D:\project\PAWKET\mobile>

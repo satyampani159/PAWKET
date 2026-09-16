@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
     print("[startup] Ready.\n")
     yield
 
-app = FastAPI(title="Finance App API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="PAWKET API", version="1.1.0-dev", lifespan=lifespan)
 
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:8081").split(",")
 allow_creds = cors_origins != ["*"]

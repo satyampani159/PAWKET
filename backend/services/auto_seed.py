@@ -3,6 +3,7 @@ services/auto_seed.py
 ---------------------
 Auto-seeds test data when the database is empty (e.g. after Render restarts).
 Inserts transactions directly — no ML parsing needed.
+NOTE: All data is simulated — not real bank SMS. See README for details.
 """
 
 import json

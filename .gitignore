@@ -4,6 +4,9 @@ __pycache__/
 venv/
 mobile/node_modules/
 mobile/.expo/
+mobile/android/
+mobile/ios/
+.expo/
 backend/finance.db
 ml_pipeline/data/
 *.apk
