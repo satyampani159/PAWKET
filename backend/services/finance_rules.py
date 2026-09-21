@@ -58,33 +58,57 @@ def analyze_5030_20(
     estimated_income: float,
 ) -> dict:
     """
-    Compares actual spending to the 50/30/20 rule.
-    Returns actual vs target for needs / wants / savings.
+    50/30/20 rule analysis.
+
+    Needs:   essential spending (EMI, utilities, health, transport, education, transfer) — target ≤ 30%
+    Wants:   lifestyle spending (food, shopping) — target ≤ 50%
+    Savings: investments + unspent income — target ≥ 20%
+
+    Percentages are of income and always sum to 100%.
     """
     needs_actual  = sum(category_totals.get(c, 0) for c in NEEDS_CATEGORIES)
     wants_actual  = sum(category_totals.get(c, 0) for c in WANTS_CATEGORIES)
-    saving_actual = sum(category_totals.get(c, 0) for c in SAVING_CATEGORIES)
+    investments   = sum(category_totals.get(c, 0) for c in SAVING_CATEGORIES)
+    total_spending = needs_actual + wants_actual + investments
 
-    needs_limit   = estimated_income * 0.50
-    wants_limit   = estimated_income * 0.30
-    saving_limit  = estimated_income * 0.20
+    # Savings = investments + unspent income (what's left after all spending)
+    savings_actual = investments + max(estimated_income - total_spending, 0)
 
-    def status(actual, limit):
-        if actual <= limit * 1.05:
-            return "on_track"
-        return "over"
+    # Percentages of income (always sum to 100%)
+    income = max(estimated_income, 1)
+    needs_pct   = round((needs_actual / income) * 100, 1)
+    wants_pct   = round((wants_actual / income) * 100, 1)
+    savings_pct = round((savings_actual / income) * 100, 1)
+
+    # Target limits
+    needs_limit  = round(income * 0.30, 2)
+    wants_limit  = round(income * 0.50, 2)
+    savings_limit = round(income * 0.20, 2)
+
+    # Status checks
+    def needs_status():
+        return "over" if needs_pct > 30 else "on_track"
+
+    def wants_status():
+        return "over" if wants_pct > 50 else "on_track"
+
+    def savings_status():
+        return "warning" if savings_pct < 20 else "on_track"
 
     return {
-        "rule_name":      "50/30/20",
-        "needs_limit":    round(needs_limit, 2),
-        "wants_limit":    round(wants_limit, 2),
-        "savings_limit":  round(saving_limit, 2),
-        "needs_actual":   round(needs_actual, 2),
-        "wants_actual":   round(wants_actual, 2),
-        "savings_actual": round(saving_actual, 2),
-        "needs_status":   status(needs_actual, needs_limit),
-        "wants_status":   status(wants_actual, wants_limit),
-        "savings_status": status(saving_actual, saving_limit),
+        "rule_name":       "50/30/20",
+        "needs_limit":     needs_limit,
+        "wants_limit":     wants_limit,
+        "savings_limit":   savings_limit,
+        "needs_actual":    round(needs_actual, 2),
+        "wants_actual":    round(wants_actual, 2),
+        "savings_actual":  round(savings_actual, 2),
+        "needs_pct":       needs_pct,
+        "wants_pct":       wants_pct,
+        "savings_pct":     savings_pct,
+        "needs_status":    needs_status(),
+        "wants_status":    wants_status(),
+        "savings_status":  savings_status(),
     }
 
 
