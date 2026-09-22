@@ -12,3 +12,5 @@ ml_pipeline/data/
 *.apk
 .DS_Store
 Thumbs.db
+backend/local_server_out.txt
+backend/local_server_err.txt

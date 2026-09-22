@@ -318,7 +318,7 @@ def generate_insights(
         merchant_totals = defaultdict(float)
         for t in transactions:
             if t.get("transaction_type") == "debit" and t.get("merchant"):
-                merchant_totals[t["merchant"]] += t.get("amount", 0)
+                merchant_totals[t["merchant"]] += (t.get("amount") or 0)
         if merchant_totals:
             total_spend_kpi = kpis.get("total_spend", 1)
             top_3 = sorted(merchant_totals.items(), key=lambda x: -x[1])[:3]
@@ -343,10 +343,10 @@ def generate_insights(
             try:
                 dt = datetime.fromisoformat(t["received_at"])
                 if dt.weekday() >= 5:  # Saturday or Sunday
-                    weekend_spend += t.get("amount", 0)
+                    weekend_spend += (t.get("amount") or 0)
                     weekend_count += 1
                 else:
-                    weekday_spend += t.get("amount", 0)
+                    weekday_spend += (t.get("amount") or 0)
                     weekday_count += 1
             except (ValueError, TypeError):
                 pass
@@ -412,7 +412,7 @@ def estimate_income(transactions: list[dict]) -> float:
     credits = [
         t["amount"] for t in transactions
         if t.get("transaction_type") == "credit"
-        and t.get("amount", 0) > 5000
+        and (t.get("amount") or 0) > 5000
     ]
 
     if credits:
@@ -421,7 +421,7 @@ def estimate_income(transactions: list[dict]) -> float:
 
     # Fallback: assume total spend is ~60% of income (saving 40%)
     total_spend = sum(
-        t.get("amount", 0) for t in transactions
+        (t.get("amount") or 0) for t in transactions
         if t.get("transaction_type") == "debit"
     )
     return total_spend / 0.60 if total_spend > 0 else 30000  # default 30k
