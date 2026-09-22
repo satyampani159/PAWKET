@@ -18,6 +18,7 @@ from routers.analytics import router as analytics_router
 from routers.correct import router as correct_router
 from routers.advice import router as advice_router
 from routers.profile import router as profile_router
+from routers.chat import router as chat_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,6 +53,7 @@ app.include_router(parse_router)
 app.include_router(analytics_router)
 app.include_router(correct_router)
 app.include_router(advice_router)
+app.include_router(chat_router)
 
 @app.get("/", tags=["health"])
 def root():

@@ -22,3 +22,6 @@ primary_region = "bom"  # Mumbai — closest to India
   memory = "512mb"
   cpu_kind = "shared"
   cpus = 1
+
+# Secrets to set via: fly secrets set GROQ_API_KEY=gsk_xxx
+# GROQ_API_KEY is set as a Fly.io secret, not in this file
