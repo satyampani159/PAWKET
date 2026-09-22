@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlalchemy import text
@@ -72,8 +72,14 @@ def health():
     return {"status": "ok", "ml_loaded": ml_models.loaded, "db_ok": db_ok}
 
 
+def require_admin(x_admin_key: str = Header(None)):
+    expected = os.getenv("ADMIN_KEY")
+    if not expected or x_admin_key != expected:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin key.")
+
+
 @app.post("/admin/reset", tags=["admin"])
-def admin_reset(seed: bool = True):
+def admin_reset(seed: bool = True, _admin: None = Depends(require_admin)):
     """Drop all tables, recreate them. Optionally re-seed with auto_seed data."""
     print("[ADMIN] Dropping all tables...")
     Base.metadata.drop_all(bind=engine)
@@ -88,7 +94,7 @@ def admin_reset(seed: bool = True):
 
 
 @app.post("/admin/drop", tags=["admin"])
-def admin_drop():
+def admin_drop(_admin: None = Depends(require_admin)):
     """Drop all tables and recreate empty — no seed data. For use with test_seed.py."""
     print("[ADMIN] Dropping all tables...")
     Base.metadata.drop_all(bind=engine)

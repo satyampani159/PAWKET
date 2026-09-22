@@ -12,7 +12,7 @@ import json
 import sys
 import time
 
-API = "https://pawket-gwqd.onrender.com"
+API = "https://p01--pawket--bsydrbrvd8nj.code.run"
 PHONE = "+917377044562"
 
 # ─── Realistic fake SMS data ───────────────────────────────────────────────
