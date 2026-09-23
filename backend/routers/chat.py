@@ -24,7 +24,10 @@ async def chat_endpoint(
 ):
     month = req.month or datetime.utcnow().strftime("%Y-%m")
 
-    analytics = get_monthly_analytics(db, month, user.id)
+    try:
+        analytics = get_monthly_analytics(db, month, user.id)
+    except Exception:
+        analytics = {}
 
     user_profile = {
         "name": user.name,

@@ -1,10 +1,12 @@
 # PAWKET — Your Wise Financial Watchdog
 
-> An AI-powered personal finance app that automatically reads bank SMS messages, categorises spending into 10 categories using machine learning, detects recurring financial patterns, and delivers personalised budgeting advice based on the 50/30/20 rule — all from your phone.
+> **v1.1.0** (Android build 3) — An AI-powered personal finance app that automatically reads bank SMS messages, categorises spending into 10 categories using machine learning, detects recurring financial patterns, delivers personalised budgeting advice based on the 50/30/20 rule, and answers money questions through a built-in AI chat assistant — all from your phone.
 
 ---
 
 ## Screenshots
+
+### Current screens
 
 | Welcome | Login | Dashboard |
 |---------|-------|-----------|
@@ -14,7 +16,34 @@
 |-----------|-------------|--------|---------|
 | ![Analytics](docs/screenshots/analytics.png) | ![Transactions](docs/screenshots/transactions.png) | ![Advice](docs/screenshots/advice.png) | ![Profile](docs/screenshots/profile.png) |
 
-> **Note:** All screenshots show the app running on **test/simulated data**, not real bank SMS. See [Data Disclaimer](#data-disclaimer) for details.
+### Phone screenshots — new in v1.1.0 (placeholders)
+
+> Drop PNG captures into `docs/screenshots/` using the file names below and they will render automatically.
+
+| Chart Detail (full screen) | AI Chat reply | Chat + keyboard |
+|----------------------------|---------------|-----------------|
+| ![Chart Detail](docs/screenshots/chart-detail.png) | ![AI Chat](docs/screenshots/ai-chat.png) | ![Chat keyboard](docs/screenshots/chat-keyboard.png) |
+
+| Dashboard stacked bar (tap) | Daily trend (tap) |
+|------------------------------|-------------------|
+| ![Stacked bar](docs/screenshots/stacked-bar.png) | ![Daily trend](docs/screenshots/daily-trend.png) |
+
+<!-- SCREENSHOT PLACEHOLDER: add phone captures (1080×2340 recommended) for:
+     chart-detail.png, ai-chat.png, chat-keyboard.png,
+     stacked-bar.png, daily-trend.png -->
+
+> **Note:** Screenshots may show test/seed data. See [Data Sources](#data-sources--real-exported-data) for how real data flows in.
+
+---
+
+## What's New in v1.1.0
+
+- **Pawket AI Chat** — ask questions like *"Where am I overspending?"* and get answers grounded in your actual monthly analytics (Groq / Llama 3.3 70B with a rule-based fallback so it always replies)
+- **Full-screen Chart Explorer** — tap any graph (donut, 3-month trend, daily spend, dashboard bar) to open a dedicated detail screen with an enlarged chart, instant rule-based insights, and an optional *"Explain with AI"* deep-dive
+- **Android keyboard fix** — the chat input now rises above the soft keyboard (`softwareKeyboardLayoutMode: resize`), the tab bar hides while typing, and the conversation auto-scrolls to the latest message
+- **App stability** — response-shape crash fixed (app no longer closes when the agent replies) and a global `ErrorBoundary` now catches render errors instead of killing the app
+- **Smarter multi-turn chat** — conversation history role-mapping fixed so follow-up questions keep their context; chat timeout raised to 20s for slow LLM replies
+- **3-Month Category Trend** — compare the last three months of category spending on Analytics
 
 ---
 
@@ -23,12 +52,12 @@
 PAWKET follows a multi-stage pipeline to transform raw SMS text into actionable financial insights:
 
 ```
-Android SMS Inbox
+Android SMS Inbox / Exported SMS batch
        │
        ▼
 ┌─────────────────┐
-│  SMS Reader      │  react-native-get-sms-android (90-day window)
-│  (Mobile App)    │  Local filtering for financial keywords (debited, credited, INR, UPI...)
+│  SMS Reader      │  react-native-get-sms-android (90-day window, APK builds)
+│  (Mobile App)    │  or POST /parse/batch for exported SMS text
 └────────┬────────┘
          │
          ▼
@@ -64,10 +93,12 @@ Android SMS Inbox
 └────────┬────────┘
          │
          ▼
-┌─────────────────┐
-│  Analytics       │  Monthly KPIs, category breakdown, daily trend, top merchants
-│  + Advice        │  50/30/20 rule, budget limits, recurring detection, personalised insights
-└─────────────────┘
+┌─────────────────┐     ┌──────────────────────┐
+│  Analytics       │     │  Pawket AI Chat       │  POST /chat → Groq Llama 3.3 70B
+│  + Advice        │────▶│  Chart Explorer       │  analytics context injected per request
+│  50/30/20, KPIs, │     │  rule-based + AI      │  rule-based fallback if LLM unavailable
+│  insights, trends│     │  explanations         │
+└─────────────────┘     └──────────────────────┘
 ```
 
 ---
@@ -75,17 +106,31 @@ Android SMS Inbox
 ## Features
 
 ### Core Functionality
-- **Auto SMS Reading** — reads bank messages on first launch, no manual entry required
+- **Auto SMS Reading** — reads bank messages on first launch (Android APK builds with `READ_SMS`), no manual entry required
+- **Batch Import of Exported SMS** — paste or API-import exported SMS text (`POST /parse/batch`, up to 500 at a time)
 - **Two-Stage ML Pipeline** — filter model discards non-financial SMS, category model classifies spending
 - **Smart Deduplication** — detects UPI app + bank duplicate SMS automatically using amount+time window matching
-- **Confidence Scoring** — shows prediction confidence with colour-coded indicators (green > 80%, yellow 60-80%, red < 60%)
+- **Confidence Scoring** — colour-coded prediction confidence (green > 80%, yellow 60–80%, red < 60%)
 - **User Corrections** — tap any transaction to fix its category (active learning loop)
 
+### AI Assistant (new)
+- **Pawket AI Chat** — natural-language questions about your spending, answered with your real monthly analytics injected into the prompt
+- **Multi-turn memory** — last 10 messages sent as context; correct `bot`→`assistant` role mapping for the LLM
+- **Always available** — rule-based fallback answers (spend totals, savings, top expenses, category questions) even when the LLM is down
+- **Quick-action chips** — one-tap starter questions on first use
+- **Keyboard-aware composer** — input rises with the keyboard, tab bar hides, conversation auto-scrolls; multiline input up to 500 chars
+
 ### Analytics & Insights
-- **Monthly KPIs** — total spend, average transaction, largest transaction, net income
-- **Category Breakdown** — horizontal bar chart with percentage distribution across 10 categories
-- **Daily Spend Trend** — bar chart showing spending patterns across days of the month
+- **Monthly KPIs** — total spend, average/median/largest transaction, net income, transaction count
+- **Category Breakdown donut** — tap → full-screen explorer with enlarged chart + descriptive insights
+- **3-Month Category Trend** — multi-series line chart of the top 6 categories across 3 months; tap → full screen
+- **Daily Spend Trend** — last-20-days bars coloured by dominant category; tap → full screen
 - **Top Merchants** — ranked list of merchants by total spend
+- **Dashboard stacked bar** — top-6 category share bar; tap → full-screen explorer
+- **Full-screen Chart Explorer (new)** — every graph opens a detail screen with:
+  - enlarged chart
+  - instant rule-based description (top category, concentration, month-over-month change, peak days…)
+  - *Explain with AI* button that returns a personalised narrative via `/chat`
 - **50/30/20 Rule** — needs/wants/savings analysis based on income and spending
 - **Budget Limits** — per-category budget recommendations as percentage of income
 - **Recurring Detection** — identifies EMIs, subscriptions, rent, and other recurring payments
@@ -98,9 +143,29 @@ Android SMS Inbox
 
 ### UI/UX
 - **Animated Welcome** — Doberman logo traces itself on launch
-- **Dark Theme** — Cred-inspired design with electric violet + hot pink gradients
-- **5-Tab Navigation** — Home, Transactions, Analytics, Advice, Profile
+- **Dark Theme** — Cred-inspired design with violet accents
+- **5-Tab Navigation** — Home, Transactions, Analytics, Advice, Profile (+ stack-pushed Chart Detail)
 - **Filterable Transaction List** — filter by category with paginated results
+- **Global Error Boundary** — unexpected render errors show a retry screen instead of crashing the app
+
+---
+
+## Data Sources & Real Exported Data
+
+PAWKET is built to work on **real Indian bank SMS data**, not just demos:
+
+| Source | What it is | Status |
+|--------|-----------|--------|
+| **Training corpus** | ~100,000 real Indian SMS messages (`ml_pipeline/data/SMS-Data.csv`, ~30MB) used to train both ML models | Real data ✅ |
+| **Live phone SMS** | On Android APK builds, the app requests `READ_SMS` and auto-syncs the last 90 days of inbox messages on launch and on app resume | Real data ✅ (requires APK + permission grant) |
+| **Exported SMS batch** | Users can export SMS from their default messenger/backup tool and import the text via the app or `POST /parse/batch` (500 messages per call) | Real data ✅ |
+| **Seed / demo data** | `backend/test_seed.py` (~70 realistic fake SMS) and `backend/services/auto_seed.py` (50+ transactions on empty DB) for demos and CI | Simulated ⚠️ |
+
+**ML models are always trained on the real corpus** — the pipeline (filter → parser → dedup → categorise) is production-grade regardless of which transaction source the device currently uses.
+
+### Data disclaimer (Play Store distribution)
+
+Reading SMS as a third-party app violates Google Play's SMS/Call Log policy for store distribution. PAWKET is therefore distributed as a **sideloaded APK / internal build**, where the user explicitly grants `READ_SMS`. For Play Store release, switch to an Account Aggregator (RBI-regulated) bank-data API or manual export import only.
 
 ---
 
@@ -109,11 +174,12 @@ Android SMS Inbox
 ### Architecture
 
 Both models use **TF-IDF vectorisation** followed by **SGDClassifier** (Stochastic Gradient Descent with logistic loss). This combination was chosen for:
+
 - **Speed**: SGD trains in seconds on 100K samples, suitable for frequent retraining
 - **Memory**: TF-IDF sparse matrices + linear classifier = ~4MB total model size
 - **Accuracy**: competitive with more complex models on text classification tasks
 
-```python
+```
 Pipeline: TfidfVectorizer(max_features=50000, ngram_range=(1,2), sublinear_tf=True)
            → SGDClassifier(loss='log_loss', max_iter=1000, random_state=42)
 ```
@@ -126,7 +192,7 @@ Pipeline: TfidfVectorizer(max_features=50000, ngram_range=(1,2), sublinear_tf=Tr
 | **Accuracy** | 98% |
 | **Algorithm** | TF-IDF + SGDClassifier |
 | **Features** | Up to 50,000 unigram + bigram features |
-| **Training Data** | ~100,000 Indian SMS messages (`SMS-Data.csv`, 30MB) |
+| **Training Data** | ~100,000 real Indian SMS messages (`SMS-Data.csv`, 30MB) |
 | **Model File** | `filter_model.pkl` (1.4 MB) |
 | **Label Generation** | Automated keyword rules in `label_rules.py` (not human-annotated) |
 
@@ -140,7 +206,7 @@ Pipeline: TfidfVectorizer(max_features=50000, ngram_range=(1,2), sublinear_tf=Tr
 | **Accuracy** | 98% (weighted average F1) |
 | **Algorithm** | TF-IDF + SGDClassifier |
 | **Features** | Up to 50,000 unigram + bigram features |
-| **Training Data** | Same ~100,000 SMS dataset |
+| **Training Data** | Same ~100,000 real SMS dataset |
 | **Model File** | `category_model.pkl` (2.9 MB) |
 
 **Categories and per-class performance:**
@@ -159,6 +225,7 @@ Pipeline: TfidfVectorizer(max_features=50000, ngram_range=(1,2), sublinear_tf=Tr
 | `transport` | 0.84 | Uber, Ola, petrol, parking |
 
 **Two-stage categorisation logic:**
+
 1. **Stage 1 — ML Prediction**: TF-IDF + SGDClassifier predicts category with confidence score
 2. **Stage 2 — Pattern Fallback**: If ML confidence < 60% or prediction is "others", the pattern engine kicks in using merchant name matching and amount+time-of-day rules
 3. **Priority**: User correction > pattern engine > ML prediction
@@ -179,6 +246,7 @@ xcopy models ..\backend\ml\models /E /I
 ```
 
 Output includes:
+
 - `filter_model.pkl` — binary filter model
 - `category_model.pkl` — 10-class category model
 - `filter_confusion_matrix.png` — confusion matrix for filter
@@ -207,45 +275,16 @@ When the ML model is uncertain, the pattern engine uses rule-based logic:
 | `GET` | `/auth/me` | Get current user profile |
 | `DELETE` | `/auth/logout` | Invalidate session |
 | `POST` | `/parse` | Parse single SMS text |
-| `POST` | `/parse/batch` | Parse up to 500 SMS in batch |
+| `POST` | `/parse/batch` | Parse up to 500 exported SMS in batch |
 | `GET` | `/analytics` | Monthly KPIs, category breakdown, daily trend |
 | `GET` | `/analytics/months` | List available months |
 | `GET` | `/analytics/transactions` | Paginated transaction list |
+| `GET` | `/analytics/compare?months=a,b,c` | Multi-month category comparison (3-month trend) |
 | `PATCH` | `/correct` | User corrects a transaction category |
 | `GET` | `/advice` | 50/30/20 analysis, budgets, insights, recurring |
+| `POST` | `/chat` | AI assistant — `{message, month, history}` → `{reply}` (Groq Llama 3.3, rule-based fallback) |
 
 Full interactive API docs available at `/docs` (Swagger UI) when the backend is running.
-
----
-
-## Data Disclaimer
-
-**The app currently operates on test/simulated data, not real bank SMS from a live phone.**
-
-### Why?
-
-Google's Android security model restricts third-party apps from reading SMS messages without explicit user consent and the `READ_SMS` permission. However, starting with Android 13+, Google Play enforces additional restrictions:
-
-1. **SMS Permission Revocation** — Google can revoke SMS read permissions from apps that don't meet their SMS app criteria
-2. **Play Store Policy** — Apps must demonstrate they are the default SMS handler or have a legitimate use case for reading SMS
-3. **Consent Flow** — Even with permission granted, the OS shows a system dialog that many users deny
-4. **Scoped Storage** — Android 11+ limits direct access to SMS content provider for non-default SMS apps
-
-These restrictions mean that while PAWKET's architecture supports real SMS reading via `react-native-get-sms-android`, **direct phone SMS import is blocked by Google's security policies for third-party apps**. The app cannot reliably read bank SMS from the phone in a production environment without becoming the default SMS handler.
-
-### Current State
-
-- **Test data source**: `backend/test_seed.py` generates ~70 realistic fake Indian bank SMS messages across all categories (food, transport, shopping, EMI, utilities, health, investment, education, transfer)
-- **Auto-seeding**: `backend/services/auto_seed.py` inserts 50+ test transactions directly into the database on server startup (for Render deployments where DB resets)
-- **ML models trained on real data**: The filter and category models were trained on ~100,000 real Indian SMS messages (`SMS-Data.csv`), so the ML pipeline itself is production-ready
-- **Backend fully functional**: All endpoints (parse, analytics, advice, deduplication) work correctly with the test data
-
-### What Would Be Needed for Production
-
-1. **Default SMS App Registration** — Register PAWKET as the default SMS handler on Android (requires user consent and Google Play approval)
-2. **SMS Backup API** — Use Android's `SmsContract` API through a backup/restore flow rather than direct reading
-3. **Alternative Data Sources** — Bank API integrations via Account Aggregator framework (RBI-regulated) instead of SMS reading
-4. **Manual Import** — Allow users to export SMS from their default SMS app and import into PAWKET
 
 ---
 
@@ -254,6 +293,7 @@ These restrictions mean that while PAWKET's architecture supports real SMS readi
 ### OTP Authentication
 
 In development, the OTP system operates in **dev mode**:
+
 - When a user requests an OTP, it is **printed to the backend console** instead of being sent via SMS
 - The OTP is valid for 5 minutes and works identically to a production OTP flow
 - This eliminates the need for an SMS gateway integration during development
@@ -262,12 +302,16 @@ In development, the OTP system operates in **dev mode**:
 [DEV MODE] OTP for +919876543210: 482916
 ```
 
+### AI Chat
+
+- Requires `GROQ_API_KEY` in `backend/.env` for LLM answers
+- Without the key (or on LLM failure) the rule-based engine still answers common questions — the chat never dies
+
 ### SMS Import
 
-Since real SMS import is blocked by Google's security policies, the app uses:
-- **Manual SMS paste**: Users can paste raw SMS text into the app for parsing
-- **Test seed data**: Pre-loaded realistic transactions for demo purposes
-- **Batch API**: `POST /parse/batch` accepts up to 500 SMS texts at once
+- **Auto-read**: APK builds read real inbox SMS (90-day window) after the user grants `READ_SMS`
+- **Manual paste / export import**: paste raw exported SMS text into the app or call `POST /parse/batch`
+- **Test seed data**: pre-loaded realistic transactions for demo purposes
 
 ---
 
@@ -277,7 +321,7 @@ Since real SMS import is blocked by Google's security policies, the app uses:
 PAWKET/
 ├── ml_pipeline/              Python — ML training pipeline
 │   ├── data/
-│   │   └── SMS-Data.csv      ~30MB dataset (~100K Indian SMS)
+│   │   └── SMS-Data.csv      ~30MB dataset (~100K real Indian SMS)
 │   ├── models/
 │   │   ├── filter_model.pkl        Bank vs spam classifier (1.4MB)
 │   │   └── category_model.pkl      10-category classifier (2.9MB)
@@ -291,15 +335,17 @@ PAWKET/
 │   ├── routers/              REST endpoint handlers
 │   │   ├── auth.py           OTP login, session tokens, /me, logout
 │   │   ├── parse.py          POST /parse and /parse/batch — core SMS processing
-│   │   ├── analytics.py      GET /analytics, /transactions, /months
+│   │   ├── analytics.py      GET /analytics, /transactions, /months, /compare
 │   │   ├── correct.py        PATCH /correct — user category corrections
 │   │   ├── advice.py         GET /advice — 50/30/20, insights, recurring
+│   │   ├── chat.py           POST /chat — AI assistant (Groq + fallback)
 │   │   └── profile.py        GET/PATCH /profile — user profile management
 │   ├── services/             Business logic layer
 │   │   ├── parser.py         Regex-based SMS field extraction
 │   │   ├── categorizer.py    Two-stage: ML model + pattern engine fallback
 │   │   ├── analytics.py      Monthly KPIs, category breakdown, daily trend
 │   │   ├── finance_rules.py  50/30/20 rule, budgets, recurring detection
+│   │   ├── chat_engine.py    Groq Llama 3.3 client + rule-based reply fallback
 │   │   ├── deduplication.py  UPI + bank duplicate SMS detection
 │   │   └── auto_seed.py      Auto-seeds test data on empty DB
 │   ├── ml/
@@ -309,17 +355,24 @@ PAWKET/
 │   └── models/
 │       └── schemas.py        Pydantic request/response schemas
 │
-└── mobile/                   React Native (Expo) — Android + iOS app
-    ├── App.js                Root component: Welcome → Login → Onboarding → AppNavigator
-    ├── src/
-    │   ├── screens/          8 screens (Welcome, Login, Onboarding, Dashboard, etc.)
-    │   ├── components/       TransactionCard, KPICard, CategoryBadge, etc.
-    │   ├── services/         API client, auth, SMS reader
-    │   ├── store/            Zustand global state management
-    │   ├── navigation/       Bottom tab navigator (5 tabs)
-    │   └── constants/        Theme, colours, category metadata
-    └── assets/
-        └── logo.png          Doberman app icon
+├── docs/screenshots/         Phone screenshots for this README
+│
+└── mobile/                   React Native (Expo) — Android app
+    ├── App.js                Root: Welcome → Login → Onboarding → ErrorBoundary → Navigator
+    ├── app.json              Expo config (v1.1.0, READ_SMS, keyboard resize mode)
+    ├── eas.json              EAS build profiles (preview = APK)
+    ├── sms-plugin.js         Expo config plugin for SMS permissions
+    └── src/
+        ├── screens/          Welcome, Login, Onboarding, Dashboard, Transactions,
+        │                     Analytics, Advice, Profile, ChartDetail, AddSMS
+        ├── components/       TransactionCard, KPICard, PieChart, MultiLineChart,
+        │                     ErrorBoundary, CategoryPicker, etc.
+        ├── services/         api.js (REST client), auth, config, smsReader,
+        │                     chartInsights (rule-based chart descriptions)
+        ├── store/            Zustand global state (analytics, transactions, chat)
+        ├── navigation/       Stack (Main, ChartDetail) + bottom tabs (5 tabs),
+        │                     keyboard-aware custom tab bar
+        └── constants/        Theme, colours, category metadata
 ```
 
 ---
@@ -332,12 +385,14 @@ PAWKET/
 | **Backend** | Python 3.11+, FastAPI, SQLAlchemy 2.0 | REST API server with async support |
 | **Database** | SQLite (SQLAlchemy ORM) | Transaction storage, user data, sessions |
 | **Validation** | Pydantic 2.0 | Request/response schema validation |
+| **AI Chat** | Groq API, Llama 3.3 70B | Grounded financial Q&A with rule-based fallback |
 | **Mobile** | React Native 0.81, Expo SDK 54 | Cross-platform mobile app |
+| **Charts** | react-native-svg (hand-rolled) | Donut, multi-line, bar charts |
 | **State** | Zustand 4.5 | Lightweight global state management |
-| **Navigation** | React Navigation 6 | Bottom tab navigator |
+| **Navigation** | React Navigation 6 | Stack + bottom tab navigator |
 | **Auth** | Phone OTP, session tokens | `secrets.token_urlsafe` for token generation |
 | **SMS Reader** | react-native-get-sms-android | Android native SMS access (90-day window) |
-| **Deployment** | Render (backend), EAS Build (mobile) | Cloud hosting + native builds |
+| **Deployment** | Cloud backend (see `mobile/src/services/config.js`), EAS Build (mobile) | Hosting + native APK builds |
 
 ---
 
@@ -347,7 +402,7 @@ PAWKET/
 
 - Python 3.11+
 - Node.js 18+
-- Expo CLI (`npm install -g expo-cli`)
+- Expo CLI (`npm install -g eas-cli` for builds)
 - Android device or emulator (for SMS reading feature)
 
 ### 1. Train the ML Models
@@ -369,10 +424,18 @@ xcopy models ..\backend\ml\models /E /I
 
 ```bash
 cd backend
-pip install -g expo-cli
 py -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # API docs: http://localhost:8000/docs
+```
+
+Create `backend/.env`:
+
+```
+ML_MODELS_DIR=ml/models
+DATABASE_URL=sqlite:///./finance.db
+CORS_ORIGINS=*
+GROQ_API_KEY=your_groq_key        # optional — enables AI chat answers
 ```
 
 ### 3. Run the Mobile App
@@ -380,17 +443,21 @@ py -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```bash
 cd mobile
 npm install
-npx expo start
+npx expo start -c
 ```
 
-Scan the QR code with **Expo Go** on your Android phone.
+Scan the QR code with **Expo Go** on your Android phone (use `-c` after config changes).
 
-For a production build with SMS reading:
+### 4. Build the Android APK
+
 ```bash
-eas build --platform android --profile preview
+cd mobile
+npx eas-cli build --platform android --profile preview   # cloud APK via EAS
 ```
 
-### 4. Seed Test Data
+Install the produced APK to get auto SMS reading (Expo Go cannot read SMS).
+
+### 5. Seed Test Data
 
 The backend auto-seeds 50+ test transactions on startup when the database is empty. To manually seed:
 
@@ -405,29 +472,15 @@ This authenticates via OTP (dev mode), then sends ~70 realistic fake SMS to the 
 
 ## Deployment
 
-**Backend** is deployed on **Render**: `https://pawket-backend.onrender.com`
+- **Backend**: cloud-hosted FastAPI (current base URL lives in `mobile/src/services/config.js`)
+- **Mobile**: EAS Build — `preview` profile produces a signed **APK**, `production` produces an AAB
 
 ### Deploy Your Own
 
-1. Push backend to GitHub
-2. Connect to [render.com](https://render.com)
-3. Select the `backend/` folder
-4. Deploy — the Dockerfile handles the rest
-
-After deployment, update the mobile app's API URL:
-```bash
-cd backend
-py update_api_url.py https://your-app.onrender.com
-```
-
-### Environment Variables
-
-Create `backend/.env`:
-```
-ML_MODELS_DIR=ml/models
-DATABASE_URL=sqlite:///./finance.db
-CORS_ORIGINS=*
-```
+1. Push this repo to GitHub
+2. Deploy `backend/` to your platform of choice (Render, Fly.io, Northflank, or local network)
+3. Update `API_BASE` in `mobile/src/services/config.js`
+4. Set `GROQ_API_KEY` for AI chat, then rebuild the APK if config changed
 
 ---
 
@@ -448,23 +501,30 @@ Six tables via SQLAlchemy ORM:
 
 ## Known Limitations
 
-1. **SMS Import Blocked by Google** — Cannot directly read bank SMS from phone due to Android security restrictions on third-party apps (see [Data Disclaimer](#data-disclaimer))
-2. **Dev OTP Only** — OTP is printed to console, not sent via SMS (no SMS gateway integration)
-3. **Test Data Only** — Current demo uses simulated transactions, not real bank data
-4. **Android Only** — SMS reading uses Android-specific APIs; iOS not supported for auto-import
-5. **Single Bank Account** — No multi-account support yet
-6. **No Push Notifications** — Not implemented yet
+1. **Play Store SMS policy** — `READ_SMS` apps are rejected by Google Play; current distribution is sideloaded APK / internal builds only (see [Data Sources](#data-sources--real-exported-data))
+2. **Android only for auto-import** — SMS reading uses Android-specific APIs; iOS has no auto-import (app UI runs, manual import only)
+3. **Dev OTP only** — OTP is printed to the backend console, not sent via SMS (no SMS gateway yet)
+4. **Seed data on fresh installs** — a brand-new account with no granted SMS permission and no import starts empty until SMS is read/imported or seed data is used
+5. **Single bank account view** — no multi-account or multi-wallet separation yet
+6. **LLM dependency for open-ended chat** — free-form questions need `GROQ_API_KEY` + network; otherwise only rule-based answers (spend, savings, top merchants, categories) are available
+7. **Chat/backed latency** — LLM replies can take up to ~15s; the client aborts after 20s and shows an error bubble (never crashes — ErrorBoundary is the last line of defence)
+8. **No push notifications** — budget or large-transaction alerts are not implemented
+9. **Charts are 20-day / 3-month windows** — daily trend shows the last 20 days; category compare uses the last 3 months
+10. **No offline analytics** — the app needs a reachable backend for fresh analytics and AI features
 
 ---
 
 ## Roadmap
 
+- [x] AI chat assistant grounded in real analytics
+- [x] Full-screen chart exploration with AI explanations
+- [x] Month vs previous month compare (3-month trend)
+- [x] Keyboard-aware chat composer on Android
 - [ ] Push notifications for large transactions
 - [ ] Budget alerts when category limit exceeded
 - [ ] Export to PDF / CSV
-- [ ] Compare month vs previous month
 - [ ] Multi-bank account support
-- [ ] Account Aggregator API integration (bypass Google SMS restrictions)
+- [ ] Account Aggregator API integration (bypass Google SMS restrictions for Play Store)
 - [ ] Web dashboard
 - [ ] iOS App Store release
 - [ ] SMS gateway integration for OTP delivery

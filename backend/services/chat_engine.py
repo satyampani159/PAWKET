@@ -136,7 +136,14 @@ async def get_chat_reply(
     # Add conversation history
     if history:
         for h in history[-8:]:
-            messages.append({"role": h.get("role", "user"), "content": h.get("text", "")})
+            raw_role = h.get("role", "user")
+            if raw_role in ("bot", "assistant"):
+                role = "assistant"
+            else:
+                role = "user"
+            content = h.get("text") or h.get("content") or ""
+            if content:
+                messages.append({"role": role, "content": content})
 
     messages.append({"role": "user", "content": message})
 

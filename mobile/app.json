@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "PAWKET",
+    "slug": "pawket",
+    "version": "1.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.satyampani.financeapp",
+      "versionCode": 3,
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_SMS",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ]
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.satyampani.financeapp"
+    },
+    "plugins": [
+      "./sms-plugin"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f16c55c6-7583-43a3-8272-f8493b2f7e88"
+      }
+    }
+  }
+}
