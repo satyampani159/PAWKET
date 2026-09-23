@@ -475,6 +475,12 @@ This authenticates via OTP (dev mode), then sends ~70 realistic fake SMS to the 
 - **Backend**: cloud-hosted FastAPI (current base URL lives in `mobile/src/services/config.js`)
 - **Mobile**: EAS Build — `preview` profile produces a signed **APK**, `production` produces an AAB
 
+### Releases
+
+| Version | Build | APK |
+|---------|-------|-----|
+| **v1.1.0** | [EAS build `e064ca8d`](https://expo.dev/accounts/satyam_pani/projects/pawket/builds/e064ca8d-448b-4dbc-bae3-f8d86e9587b3) | [Download APK](https://expo.dev/artifacts/eas/slIqaX-qPyBQvX2spRwFSYh_eKV-XiFH8sAxP57Xlxc.apk) (also built locally as `PAWKET-v1.1.0.apk`) |
+
 ### Deploy Your Own
 
 1. Push this repo to GitHub
