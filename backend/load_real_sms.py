@@ -10,6 +10,7 @@ Optionally resets the DB first (--reset) so the app contains only real data.
 Usage:
     python load_real_sms.py --batch "../ml_pipeline/data/real_sms_batch.json"
     python load_real_sms.py --batch <file> --api <url> --phone <number> --reset
+    python load_real_sms.py --batch <file> --store   # also save JSON server-side for startup auto-ingest
 """
 
 import argparse
@@ -44,6 +45,8 @@ def main():
     ap.add_argument("--phone", default=DEFAULT_PHONE)
     ap.add_argument("--admin-key", default=None, help="X-Admin-Key for /admin/reset")
     ap.add_argument("--reset", action="store_true", help="Clear DB first (seed=false)")
+    ap.add_argument("--store", action="store_true",
+                    help="Also store the batch server-side (REAL_SMS_BATCH) for startup auto-ingest")
     args = ap.parse_args()
 
     entries = json.load(open(args.batch, encoding="utf-8"))
@@ -90,6 +93,20 @@ def main():
     print("\n" + "=" * 50)
     print(f"TOTAL: parsed={total['parsed']} ignored={total['ignored']} "
           f"duplicates={total['duplicates']} errors={total['errors']}")
+
+    # ---- Optionally store batch server-side so startup can auto-ingest if DB empties ----
+    if args.store:
+        if not args.admin_key:
+            print("\n[STORE] Skipped — --admin-key required for /admin/load-batch.")
+        else:
+            print("\n[STORE] Saving batch server-side for auto-ingest...")
+            r = requests.post(
+                f"{args.api}/admin/load-batch",
+                json={"phone": args.phone, "entries": entries, "store_only": True},
+                headers={"X-Admin-Key": args.admin_key},
+                timeout=120,
+            )
+            print("  ", r.status_code, r.json() if r.headers.get("content-type", "").startswith("application/json") else r.text[:200])
 
     # ---- Verify what the app will see ----
     me = requests.get(f"{args.api}/auth/me", headers=headers, timeout=30).json()

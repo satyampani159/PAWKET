@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from pydantic import BaseModel
 from sqlalchemy import text
 
 load_dotenv()
@@ -30,16 +31,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[startup] WARNING: ML models failed to load: {e}")
         print("[startup] Running without ML — parse endpoints will return 503.")
-    print("[startup] Auto-seeding test data if empty...")
+    print("[startup] Bootstrapping data if DB is empty...")
     try:
-        from services.auto_seed import auto_seed
-        auto_seed()
+        from services.ingest import bootstrap_if_empty
+        bootstrap_if_empty()
     except Exception as e:
-        print(f"[startup] Auto-seed skipped: {e}")
+        print(f"[startup] Data bootstrap skipped: {e}")
     print("[startup] Ready.\n")
     yield
 
-app = FastAPI(title="PAWKET API", version="1.1.0-dev", lifespan=lifespan)
+app = FastAPI(title="PAWKET API", version="1.1.1", lifespan=lifespan)
 
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:8081").split(",")
 allow_creds = cors_origins != ["*"]
@@ -101,3 +102,44 @@ def admin_drop(_admin: None = Depends(require_admin)):
     print("[ADMIN] Recreating empty tables...")
     Base.metadata.create_all(bind=engine)
     return {"status": "dropped", "message": "All data cleared. Empty DB ready for test_seed.py."}
+
+
+class LoadBatchRequest(BaseModel):
+    phone: str
+    entries: list = []
+    store_only: bool = False
+
+
+@app.post("/admin/load-batch", tags="admin")
+def admin_load_batch(req: LoadBatchRequest, _admin: None = Depends(require_admin)):
+    """Ingest a real SMS batch for a phone number and/or store it for startup auto-ingest.
+
+    - Normal mode: runs entries through the ML pipeline (dedup-safe) into that user's DB.
+    - store_only=true: only persists entries to REAL_SMS_BATCH (no ingest).
+    """
+    from services.ingest import get_or_create_user, ingest_entries, store_batch_file
+
+    phone = req.phone.strip()
+    if not phone.startswith("+") or len(phone) < 10:
+        raise HTTPException(status_code=400, detail="phone must be international format, e.g. +911234567890")
+    if not req.entries:
+        raise HTTPException(status_code=400, detail="entries is empty.")
+
+    if req.store_only:
+        stored, path = store_batch_file(req.entries)
+        return {"status": "stored", "phone": phone, "stored": stored, "path": path,
+                "entries": len(req.entries)}
+
+    if not ml_models.loaded:
+        raise HTTPException(status_code=503, detail="ML models not loaded.")
+
+    db = SessionLocal()
+    try:
+        user = get_or_create_user(db, phone)
+        counts = ingest_entries(req.entries, user, db)
+    finally:
+        db.close()
+
+    stored, path = store_batch_file(req.entries)
+    print(f"[ADMIN] load-batch for {phone}: {counts} stored={stored}")
+    return {"status": "ok", "phone": phone, "stored": stored, "path": path, **counts}

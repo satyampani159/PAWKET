@@ -1,65 +1,13 @@
 import json
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.database import get_db, Transaction, User
 from models.schemas import ParseRequest, ParseResponse
-from services.parser import parse_sms
-from services.categorizer import categorize
-from services.deduplication import is_duplicate
+from services.ingest import process_one as _process_one, ingest_entries
 from ml.ml_loader import ml_models
 from routers.auth import require_auth
 
 router = APIRouter(prefix="/parse", tags=["parse"])
-
-
-def _process_one(text, sms_id, received_at, sender, user_id, db):
-    """Shared logic for single and batch parse."""
-    try:
-        text = text.strip()
-        if not text:
-            return "empty", None
-
-        is_financial, _ = ml_models.predict_filter(text)
-        if not is_financial:
-            return "ignored", None
-
-        parsed   = parse_sms(text)
-        received = received_at or parsed.get("received_at") or datetime.utcnow()
-        amount   = parsed.get("amount")
-        txn_type = parsed.get("transaction_type", "debit")
-
-        # Smart deduplication — catches UPI app + bank SMS duplicates
-        if is_duplicate(db, user_id, amount, txn_type, received, sms_id, text):
-            return "duplicate", None
-
-        cat = categorize(
-            text=text, amount=amount,
-            received_at=received, merchant=parsed.get("merchant"),
-        )
-
-        txn = Transaction(
-            user_id            = user_id,
-            sms_id             = sms_id,
-            raw_text           = text,
-            amount             = amount,
-            merchant           = parsed.get("merchant"),
-            bank               = parsed.get("bank"),
-            sender             = sender,
-            transaction_type   = txn_type,
-            received_at        = received,
-            predicted_category = cat["predicted_category"],
-            ml_confidence      = cat["confidence"],
-            all_scores         = json.dumps(cat["all_scores"]),
-            pattern_category   = cat["pattern_category"],
-            final_category     = cat["final_category"],
-            is_corrected       = False,
-        )
-        db.add(txn)
-        return "parsed", txn
-    except Exception as e:
-        print(f"[PARSE] Error processing SMS: {e}")
-        return "error", None
 
 
 @router.post("", response_model=ParseResponse)
@@ -110,30 +58,7 @@ def parse_batch(req: list[ParseRequest], user: User = Depends(require_auth), db:
     if len(req) > 500:
         raise HTTPException(status_code=400, detail="Max 500 messages per batch.")
 
-    parsed_count = ignored_count = duplicate_count = error_count = 0
-
-    for item in req:
-        status, _ = _process_one(
-            item.text, item.sms_id, item.received_at, item.sender, user.id, db
-        )
-        if status == "parsed":
-            parsed_count += 1
-        elif status in ("ignored", "empty"):
-            ignored_count += 1
-        elif status == "duplicate":
-            duplicate_count += 1
-        elif status == "error":
-            error_count += 1
-
-    db.commit()
-
-    return {
-        "parsed":     parsed_count,
-        "ignored":    ignored_count,
-        "duplicates": duplicate_count,
-        "errors":     error_count,
-        "total":      len(req),
-    }
+    return ingest_entries(req, user, db)
 
 
 @router.get("/dedup-scan")

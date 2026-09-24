@@ -159,7 +159,9 @@ PAWKET is built to work on **real Indian bank SMS data**, not just demos:
 | **Training corpus** | ~100,000 real Indian SMS messages (`ml_pipeline/data/SMS-Data.csv`, ~30MB) used to train both ML models | Real data ✅ |
 | **Live phone SMS** | On Android APK builds, the app requests `READ_SMS` and auto-syncs the last 90 days of inbox messages on launch and on app resume | Real data ✅ (requires APK + permission grant) |
 | **Exported SMS batch** | Users can export SMS from their default messenger/backup tool and import the text via the app or `POST /parse/batch` (500 messages per call) | Real data ✅ |
-| **Seed / demo data** | `backend/test_seed.py` (~70 realistic fake SMS) and `backend/services/auto_seed.py` (50+ transactions on empty DB) for demos and CI | Simulated ⚠️ |
+| **Seed / demo data** | `backend/test_seed.py` (~70 realistic fake SMS) and `backend/services/auto_seed.py` (68 transactions on empty DB, gated by `AUTO_SEED=true`; production sets `AUTO_SEED=false`) for demos and CI | Simulated ⚠️ |
+
+**Startup data bootstrap** (priority order): existing data → auto-ingest from `REAL_SMS_BATCH` (stored real batch) → seed test data if `AUTO_SEED` is enabled → leave empty. The real batch can be (re)loaded anytime with `backend/load_real_sms.py --reset --store`, which also saves it server-side for future auto-ingest.
 
 **ML models are always trained on the real corpus** — the pipeline (filter → parser → dedup → categorise) is production-grade regardless of which transaction source the device currently uses.
 
@@ -436,6 +438,10 @@ ML_MODELS_DIR=ml/models
 DATABASE_URL=sqlite:///./finance.db
 CORS_ORIGINS=*
 GROQ_API_KEY=your_groq_key        # optional — enables AI chat answers
+ADMIN_KEY=change_me_admin         # required for /admin/* endpoints
+AUTO_SEED=true                    # seed test data on empty DB (set false in production)
+# REAL_SMS_BATCH=/data/real_sms_batch.json   # path for startup auto-ingest of real SMS
+# REAL_PHONE=+911234567890                    # phone used for auto-ingest (default +917377044562)
 ```
 
 ### 3. Run the Mobile App
@@ -457,9 +463,23 @@ npx eas-cli build --platform android --profile preview   # cloud APK via EAS
 
 Install the produced APK to get auto SMS reading (Expo Go cannot read SMS).
 
-### 5. Seed Test Data
+### 5. Seed / Restore Data
 
-The backend auto-seeds 50+ test transactions on startup when the database is empty. To manually seed:
+On startup the backend bootstraps an empty database in this order:
+
+1. **Auto-ingest** the stored real batch if `REAL_SMS_BATCH` points to an existing file
+2. **Seed test data** (68 fake transactions) if `AUTO_SEED=true` (default)
+3. Otherwise leave the DB empty
+
+To load your real exported SMS (and store the batch for future auto-ingest):
+
+```bash
+cd backend
+py load_real_sms.py --batch "../ml_pipeline/data/real_sms_batch.json" --reset --store \
+  --admin-key <ADMIN_KEY>
+```
+
+To manually push fake test SMS instead:
 
 ```bash
 cd backend
@@ -485,8 +505,15 @@ This authenticates via OTP (dev mode), then sends ~70 realistic fake SMS to the 
 
 1. Push this repo to GitHub
 2. Deploy `backend/` to your platform of choice (Render, Fly.io, Northflank, or local network)
-3. Update `API_BASE` in `mobile/src/services/config.js`
-4. Set `GROQ_API_KEY` for AI chat, then rebuild the APK if config changed
+3. **Attach a persistent volume/disk** and point the DB at it so restarts don't wipe data:
+   - Mount at e.g. `/data`, then set `DATABASE_URL=sqlite:////data/finance.db`
+4. Set env vars on the service:
+   - `AUTO_SEED=false` — never fill production with fake data
+   - `REAL_SMS_BATCH=/data/real_sms_batch.json` — startup auto-ingest source
+   - `ADMIN_KEY` — required for `/admin/*` (reset, drop, load-batch)
+   - `GROQ_API_KEY` — for AI chat answers
+5. Load real data once: `py backend/load_real_sms.py --batch ... --reset --store --admin-key <ADMIN_KEY>`
+6. Update `API_BASE` in `mobile/src/services/config.js`, then rebuild the APK if config changed
 
 ---
 
@@ -510,7 +537,7 @@ Six tables via SQLAlchemy ORM:
 1. **Play Store SMS policy** — `READ_SMS` apps are rejected by Google Play; current distribution is sideloaded APK / internal builds only (see [Data Sources](#data-sources--real-exported-data))
 2. **Android only for auto-import** — SMS reading uses Android-specific APIs; iOS has no auto-import (app UI runs, manual import only)
 3. **Dev OTP only** — OTP is printed to the backend console, not sent via SMS (no SMS gateway yet)
-4. **Seed data on fresh installs** — a brand-new account with no granted SMS permission and no import starts empty until SMS is read/imported or seed data is used
+4. **Ephemeral DB without a volume** — if the backend runs with a container-local SQLite file and no persistent disk, every redeploy starts empty (then `REAL_SMS_BATCH` auto-ingest or `AUTO_SEED` repopulates it); attach a volume in production to keep data
 5. **Single bank account view** — no multi-account or multi-wallet separation yet
 6. **LLM dependency for open-ended chat** — free-form questions need `GROQ_API_KEY` + network; otherwise only rule-based answers (spend, savings, top merchants, categories) are available
 7. **Chat/backed latency** — LLM replies can take up to ~15s; the client aborts after 20s and shows an error bubble (never crashes — ErrorBoundary is the last line of defence)
