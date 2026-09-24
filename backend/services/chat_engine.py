@@ -99,7 +99,7 @@ def _category_reply(breakdown, cat):
     b = next((x for x in breakdown if x.get("category") == cat), None)
     if not b:
         return None
-    avg = b.get("avg_transaction") or (b["total"] / b["count"] if b.get("count") else 0)
+    avg = (b["total"] / b["count"]) if b.get("count") else (b.get("avg_transaction") or 0)
     return (f"You spent ₹{b['total']:,.0f} on {cat} ({b['percentage']}% of your total spending) "
             f"across {b['count']} transactions, averaging ₹{avg:,.0f} each.")
 
