@@ -16,6 +16,11 @@ class ChatRequest(BaseModel):
     history: list[dict] | None = None
 
 
+def _prev_month(month: str) -> str:
+    y, m = int(month[:4]), int(month[5:7])
+    return f"{y - 1:04d}-12" if m == 1 else f"{y:04d}-{m - 1:02d}"
+
+
 @router.post("")
 async def chat_endpoint(
     req: ChatRequest,
@@ -28,6 +33,11 @@ async def chat_endpoint(
         analytics = get_monthly_analytics(db, month, user.id)
     except Exception:
         analytics = {}
+
+    try:
+        prev_analytics = get_monthly_analytics(db, _prev_month(month), user.id)
+    except Exception:
+        prev_analytics = {}
 
     user_profile = {
         "name": user.name,
@@ -42,6 +52,7 @@ async def chat_endpoint(
         month=month,
         history=req.history or [],
         user_profile=user_profile,
+        prev_analytics=prev_analytics,
     )
 
     return {"reply": reply}

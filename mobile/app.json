@@ -2,13 +2,23 @@
   "expo": {
     "name": "PAWKET",
     "slug": "pawket",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D0F14"
+    },
     "android": {
       "package": "com.satyampani.financeapp",
-      "versionCode": 3,
+      "versionCode": 4,
       "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#7C3AED"
+      },
       "permissions": [
         "android.permission.READ_SMS",
         "android.permission.RECEIVE_SMS",
