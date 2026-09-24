@@ -10,6 +10,7 @@ mobile/ios/
 backend/finance.db
 ml_pipeline/data/
 *.apk
+!PAWKET-v1.1.1.apk
 .DS_Store
 Thumbs.db
 backend/local_server_out.txt
