@@ -56,13 +56,13 @@ No spreadsheets, no manual entry, no linking bank credentials — just SMS you a
 
 Real device captures (Android, September 2026 data). Screenshots may show test/seed data — see [Data Sources](#data-sources).
 
-| Dashboard (Home) | Analytics | Transactions |
+| Dashboard (Home) | Analytics | Analytics Clicked |
 |---------|-------|-----------|
 | ![Dashboard](docs/screenshots/dashboard.jpeg) | ![Analytics](docs/screenshots/analytics.jpeg) | ![Transactions](docs/screenshots/transactions.jpeg) |
 
 **Home** shows the month's total spend, income, net and transaction count, quick KPI cards (avg txn, largest, uncategorised), top category, the stacked spending-breakdown bar, and recent transactions. **Analytics** gives key numbers, the category donut, 3-month trends and daily spend charts (tap any chart for the full-screen explorer). **Transactions** is the filterable list — every row shows the category chip, ML confidence colour, and *tap to edit*.
 
-| Chart Explorer (tap any chart) | Advice + Ask Pawket | Profile |
+| Chart Explorer (Advice + Ask Pawket) | Transaction | Profile |
 |----------------------------|---------------|---------|
 | ![Chart Explorer](docs/screenshots/chart-detail.jpeg) | ![Advice](docs/screenshots/advice.jpeg) | ![Profile](docs/screenshots/profile.jpeg) |
 
