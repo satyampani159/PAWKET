@@ -64,13 +64,13 @@ Real device captures (Android, September 2026 data). Screenshots may show test/s
 
 | Chart Explorer (Advice + Ask Pawket) | Transaction | Profile |
 |----------------------------|---------------|---------|
-| ![Chart Explorer](docs/screenshots/chart-detail.jpeg) | ![Advice](docs/screenshots/advice.jpeg) | ![Profile](docs/screenshots/profile.jpeg) |
+| ![Chart Explorer](docs/screenshots/chart-detail.jpeg) | ![Advice](docs/screenshots/transactions-filter.jpeg) | ![Profile](docs/screenshots/profile.jpeg) |
 
 **Chart Explorer** is the full-screen detail view: enlarged donut, instant rule-based insights ("What this chart tells you"), and an *Ask Pawket AI* button for a personalised narrative. **Advice** surfaces personalised insights (recurring payments, categorisation accuracy, spending changes, weekend spikes, savings-rate warnings) plus the AI chat with one-tap starter questions. **Profile** holds your identity, financial goal, income, SMS import control and goal tips.
 
 | Filter by category | Correct a prediction (active learning) |
 |-------------------|----------------------------------------|
-| ![Transactions filtered](docs/screenshots/transactions-filter.jpeg) | ![Change category](docs/screenshots/category-correct.jpeg) |
+| ![Transactions filtered](docs/screenshots/advice.jpeg) | ![Change category](docs/screenshots/category-correct.jpeg) |
 
 **Filter chips** slice the list by category (e.g. 36 Food & Dining transactions of 65). **Change Category** is the correction sheet — tap any transaction, pick the right category, and your correction permanently overrides the ML model for that transaction (and is counted toward the app's accuracy insight).
 
