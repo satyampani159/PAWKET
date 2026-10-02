@@ -110,7 +110,7 @@ Real device captures (Android, September 2026 data). Screenshots may show test/s
 - **Active learning** — tap any transaction to correct its category; user corrections beat both the pattern engine and the ML model.
 
 ### AI Assistant
-- **Pawket AI Chat** (Advice tab) — natural-language questions about your spending, answered using your **real monthly analytics injected into the prompt** (Groq LLM).
+- **Pawket AI Chat** (Advice tab) — natural-language questions about your spending, answered using your **real monthly analytics injected into the prompt** (Ollama Cloud LLM).
 - **Specific-first rule engine** — common questions (*"How much did I spend?"*, *"Where am I overspending?"*, *"Am I saving enough?"*) are answered instantly and deterministically before any LLM call.
 - **Multi-turn memory** — the client sends the last 10 messages, the server feeds the last 8 to the LLM with correct `bot` → `assistant` role mapping, so follow-ups keep context.
 - **Never dead-ends** — if the LLM is slow, down, or has no API key, a rule-based reply or an offline data summary is returned instead of an error.
@@ -190,7 +190,7 @@ Android SMS Inbox / Exported SMS batch
 ┌──────────────────┐     ┌───────────────────────────────────────────┐
 │  Analytics        │     │  Pawket AI Chat / Chart Explorer          │
 │  + Advice         │────▶│  1) specific-first rule engine            │
-│  50/30/20, KPIs,  │     │  2) Groq LLM (gpt-oss-120b) with your     │
+│  50/30/20, KPIs,  │     │  2) Ollama (gemma4:31b) with your data   │
 │  insights, trends │     │     monthly analytics injected as context  │
 │                   │     │  3) offline data summary fallback         │
 └──────────────────┘     └───────────────────────────────────────────┘
@@ -214,7 +214,7 @@ Android SMS Inbox / Exported SMS batch
                                             on-device SMS     │          │ HTTPS
                                             (90-day window)   │          ▼
                                                       ┌───────┴───┐  ┌──────────┐
-                                                      │  .pkl     │  │  Groq    │
+                                                      │  .pkl     │  │ Ollama   │
                                                       │  models   │  │  LLM API │
                                                       └───────────┘  └──────────┘
 ```
@@ -357,14 +357,14 @@ POST /chat  {message, month, history[≤10]}
    top/highest → overspending/savings → month-over-month compare → generic totals
    │  answered? ──▶ reply returned immediately
    ▼ not matched
-② Groq LLM call
-   model: openai/gpt-oss-120b (override with GROQ_API_KEY/GROQ_MODEL env)
+② Ollama Cloud LLM call
+   model: gemma4:31b (override with OLLAMA_MODEL env; needs OLLAMA_API_KEY)
    system prompt: "Pawket" persona — ₹ amounts, 2-3 sentence max, honest, no invented numbers
    context injected: month, total spent/received, txn count, avg/median/largest,
                      top category, category breakdown (top 8), top merchants (top 5),
                      user name + financial goal
    history: last 8 turns, bot → assistant role mapping
-   timeouts: 15s server (httpx) / 20s client (AbortController)
+   timeouts: 60s server (httpx) / 20s client (AbortController)
    │  success? ──▶ LLM reply returned
    ▼ failed / no API key / empty content (reasoning-token exhaustion)
 ③ Offline data summary
@@ -381,7 +381,7 @@ Calling an LLM for *"how much did I spend this month"* wastes 3–10 seconds and
 - **Always answers** — every layer fails *forward* to the next; the client shows an error bubble only if the whole 20s budget is exhausted (plus a global `ErrorBoundary` as last resort).
 - **Always grounded** — the LLM sees the user's real monthly numbers as context and is instructed to say so when something isn't in the data, never to invent figures.
 - **Multi-turn** — follow-up questions keep context through the last 8 turns of history.
-- **Cheap** — Groq's free tier; the rule engine absorbs the high-volume simple questions.
+- **Cheap** — Ollama Cloud hosts the model; the rule engine absorbs the high-volume simple questions.
 
 ### SMS Parsing and Deduplication
 
@@ -443,14 +443,14 @@ PAWKET/
 │   │   ├── analytics.py      GET /analytics, /transactions, /months, /compare
 │   │   ├── correct.py        PATCH /correct — user category corrections
 │   │   ├── advice.py         GET /advice — 50/30/20, insights, recurring
-│   │   ├── chat.py           POST /chat — AI assistant (rules → Groq → summary)
+│   │   ├── chat.py           POST /chat — AI assistant (rules → Ollama → summary)
 │   │   └── profile.py        GET/PATCH /profile — user profile management
 │   ├── services/             Business logic layer
 │   │   ├── parser.py         Regex-based SMS field extraction
 │   │   ├── categorizer.py    Two-stage: ML model + pattern engine fallback
 │   │   ├── analytics.py      Monthly KPIs, category breakdown, daily trend
 │   │   ├── finance_rules.py  50/30/20 rule, budgets, recurring detection, insights
-│   │   ├── chat_engine.py    Rule engine + Groq client + offline summary
+│   │   ├── chat_engine.py    Rule engine + Ollama client + offline summary
 │   │   ├── deduplication.py  UPI + bank duplicate SMS detection
 │   │   ├── ingest.py         Startup auto-ingest from stored real batch
 │   │   └── auto_seed.py      Auto-seeds test data on empty DB (AUTO_SEED gated)
@@ -491,7 +491,7 @@ PAWKET/
 | **Backend** | Python 3.11+, FastAPI, SQLAlchemy 2.0 | Async REST API |
 | **Database** | SQLite (SQLAlchemy ORM) | Transactions, users, sessions |
 | **Validation** | Pydantic 2.0 | Request/response schemas |
-| **AI Chat** | Groq API (`openai/gpt-oss-120b` default) | Grounded financial Q&A with rule + summary fallback |
+| **AI Chat** | Ollama Cloud (`gemma4:31b` default) | Grounded financial Q&A with rule + summary fallback |
 | **Mobile** | React Native 0.81, Expo SDK 54 | Android app |
 | **Charts** | react-native-svg (hand-rolled) | Donut, multi-line, bar, stacked bar |
 | **State** | Zustand 4.5 | Lightweight global state |
@@ -541,8 +541,10 @@ Create `backend/.env`:
 ML_MODELS_DIR=ml/models
 DATABASE_URL=sqlite:///./finance.db
 CORS_ORIGINS=*
-GROQ_API_KEY=your_groq_key        # optional — enables LLM chat answers
-GROQ_MODEL=openai/gpt-oss-120b    # optional — override the Groq model
+OLLAMA_API_KEY=your_ollama_key      # optional — enables LLM chat answers
+OLLAMA_BASE_URL=https://ollama.com/v1/chat/completions
+OLLAMA_MODEL=gemma4:31b             # optional — override the Ollama Cloud model
+OLLAMA_TIMEOUT=60
 ADMIN_KEY=change_me_admin         # required for /admin/* endpoints
 AUTO_SEED=true                    # seed test data on empty DB (false in production)
 # REAL_SMS_BATCH=/data/real_sms_batch.json   # startup auto-ingest of real SMS
@@ -619,8 +621,8 @@ In development the OTP is **printed to the backend console and returned in the A
 
 ### AI chat
 
-- Without `GROQ_API_KEY`, the rule engine and offline summary still answer — chat never dies.
-- With the key, open-ended questions go to Groq (`GROQ_MODEL`, default `openai/gpt-oss-120b`).
+- Without `OLLAMA_API_KEY`, the rule engine and offline summary still answer — chat never dies.
+- With the key, open-ended questions go to Ollama Cloud (`OLLAMA_MODEL`, default `gemma4:31b`).
 
 ### SMS import
 
@@ -644,7 +646,7 @@ In development the OTP is **printed to the backend console and returned in the A
    - `AUTO_SEED=false` — never fill production with fake data
    - `REAL_SMS_BATCH=/data/real_sms_batch.json` — startup auto-ingest source
    - `ADMIN_KEY` — required for `/admin/*`
-   - `GROQ_API_KEY` / `GROQ_MODEL` — for LLM chat answers
+   - `OLLAMA_API_KEY` / `OLLAMA_BASE_URL` / `OLLAMA_MODEL` (`gemma4:31b`) / `OLLAMA_TIMEOUT` — for LLM chat answers
 5. Load real data once: `py backend/load_real_sms.py --batch ... --reset --store --admin-key <ADMIN_KEY>`
 6. Update `API_BASE` in `mobile/src/services/config.js`, then rebuild the APK if config changed
 
@@ -673,7 +675,7 @@ Six tables via SQLAlchemy ORM:
 
 3. **Dev-mode OTP** — OTPs are printed to the backend console and returned in the API response, not sent by SMS (no gateway integrated yet). For sideloaded installs the login OTP must be obtained from whoever runs the backend — an SMS gateway is required before wider distribution.
 
-4. **LLM needed for open-ended chat** — free-form questions require `GROQ_API_KEY` + network. Without them you still get rule-based answers (spend totals, savings, top merchants, category questions, month-over-month) and offline summaries, but no creative reasoning.
+4. **LLM needed for open-ended chat** — free-form questions require `OLLAMA_API_KEY` + network. Without them you still get rule-based answers (spend totals, savings, top merchants, category questions, month-over-month) and offline summaries, but no creative reasoning.
 
 5. **Chat latency** — LLM replies can take up to ~15s server-side; the client aborts after 20s and shows an error bubble (never crashes — `ErrorBoundary` is the last line of defence). Rule-engine answers are instant.
 

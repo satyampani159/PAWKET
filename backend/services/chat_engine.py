@@ -1,8 +1,11 @@
 """
 services/chat_engine.py
 -----------------------
-AI chat engine using Groq (free tier, Llama 3.3 70B).
-Falls back to rule-based responses if Groq is unavailable.
+AI chat engine using Ollama (cloud default: gemma4:31b).
+Supports both:
+- Ollama Cloud: https://ollama.com/v1/chat/completions (needs OLLAMA_API_KEY)
+- Local Ollama: http://localhost:11434/v1/chat/completions (run `ollama pull qwen2.5:7b`)
+Falls back to rule-based responses if Ollama is unavailable.
 """
 
 import os
@@ -11,9 +14,29 @@ import json
 import httpx
 from typing import Optional
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+# NOTE: read via os.getenv at call time too (see _get_ollama_config),
+# these module-level defaults are for backwards-compat / quick reference.
+OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "https://ollama.com/v1/chat/completions")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:31b")
+OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "60") or "60")
+
+
+def _get_ollama_config():
+    """Read Ollama config live so .env changes don't need code edits."""
+    api_key = os.getenv("OLLAMA_API_KEY", OLLAMA_API_KEY or "")
+    base_url = os.getenv("OLLAMA_BASE_URL", OLLAMA_BASE_URL or "https://ollama.com/v1/chat/completions")
+    model = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL or "gemma4:31b")
+    try:
+        timeout = float(os.getenv("OLLAMA_TIMEOUT", str(OLLAMA_TIMEOUT)) or "60")
+    except ValueError:
+        timeout = 60.0
+    return base_url.strip(), api_key.strip(), model.strip(), timeout
+
+
+def _is_local_url(url: str) -> bool:
+    u = (url or "").lower()
+    return "localhost" in u or "127.0.0.1" in u or "0.0.0.0" in u
 
 SYSTEM_PROMPT = """You are Pawket, a friendly and smart personal finance assistant for an Indian user.
 You have access to their actual financial data for the current month. Use it to give specific, actionable advice.
@@ -235,14 +258,16 @@ async def get_chat_reply(
     user_profile: dict = None,
     prev_analytics: dict = None,
 ) -> str:
-    """Get a chat reply using Groq API, with rule-based fallback."""
+    """Get a chat reply using Ollama (qwen2.5), with rule-based fallback."""
     # Try rule-based first for common queries
     rule_reply = _rule_based_reply(message, analytics, month=month, prev_analytics=prev_analytics)
     if rule_reply:
         return rule_reply
 
-    # If no Groq key, return a useful data snapshot
-    if not GROQ_API_KEY:
+    base_url, api_key, model, timeout = _get_ollama_config()
+
+    # Local Ollama doesn't need a key; Cloud does.
+    if not api_key and not _is_local_url(base_url):
         return _offline_summary(analytics, month)
 
     context = _build_context(analytics, month, user_profile)
@@ -264,29 +289,40 @@ async def get_chat_reply(
     messages.append({"role": "user", "content": message})
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        elif _is_local_url(base_url):
+            # Local Ollama ignores the key, but OpenAI clients require something.
+            headers["Authorization"] = "Bearer ollama"
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
-                GROQ_BASE_URL,
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "Content-Type": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                },
+                base_url,
+                headers=headers,
                 json={
-                    "model": GROQ_MODEL,
+                    "model": model,
                     "messages": messages,
                     "max_tokens": 1024,
                     "temperature": 0.7,
+                    "stream": False,
                 },
             )
             resp.raise_for_status()
             data = resp.json()
-            content = (data["choices"][0]["message"].get("content") or "").strip()
+            # OpenAI-compatible shape: choices[0].message.content
+            # Native Ollama shape fallback: message.content
+            content = ""
+            try:
+                content = (data["choices"][0]["message"].get("content") or "").strip()
+            except (KeyError, IndexError, TypeError, AttributeError):
+                content = ((data.get("message") or {}).get("content") or "").strip()
             if not content:
                 # reasoning models can exhaust max_tokens on reasoning alone
                 return _offline_summary(analytics, month)
             return content
     except Exception as e:
-        print(f"[CHAT] Groq API error: {e}")
+        # Common case: model not hosted on Ollama Cloud (e.g. qwen2.5:7b
+        # is local-only). Log a helpful hint, then fall back to data snapshot.
+        print(f"[CHAT] Ollama API error (model={model} url={base_url}): {e}")
         return _offline_summary(analytics, month)

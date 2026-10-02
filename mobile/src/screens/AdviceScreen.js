@@ -91,7 +91,8 @@ export default function AdviceScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <ScrollView
         ref={scrollRef}
@@ -186,6 +187,7 @@ export default function AdviceScreen() {
             onChangeText={setInput}
             placeholder="Ask about your spending..."
             placeholderTextColor={COLORS.textMuted}
+            returnKeyType="send"
             multiline
             maxLength={500}
             onSubmitEditing={() => sendMessage()}
