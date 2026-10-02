@@ -461,7 +461,7 @@ PAWKET/
 │   └── models/schemas.py     Pydantic request/response schemas
 │
 ├── docs/screenshots/         Real device screenshots used in this README
-├── PAWKET-v1.1.1.apk         Latest installable Android build (72MB)
+├── PAWKET-v1.1.2.apk         Latest installable Android build (72MB)
 │
 └── mobile/                   React Native (Expo) — Android app
     ├── App.js                Root: Welcome → Login → Onboarding → ErrorBoundary → Navigator
