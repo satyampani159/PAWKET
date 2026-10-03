@@ -3,14 +3,14 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, TextInput, KeyboardAvoidingView,
-  Platform, ActivityIndicator, Keyboard,
+  Platform, ActivityIndicator, Keyboard, Modal, Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAdvice, sendChat } from '../services/api';
 import useStore from '../store/useStore';
-import { COLORS, FONTS, RADIUS, SHADOW, CATEGORY_META } from '../constants/theme';
-import { SectionHeader, Loader, EmptyState } from '../components';
+import { COLORS, FONTS, RADIUS } from '../constants/theme';
+import { Loader, EmptyState } from '../components';
 
 const INSIGHT_COLORS = {
   warning:     { bg: '#C46B6B18', border: '#C46B6B', iconName: 'warning' },
@@ -36,21 +36,23 @@ export default function AdviceScreen() {
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [insightsVisible, setInsightsVisible] = useState(false);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const insets = useSafeAreaInsets();
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [kbHeight, setKbHeight] = useState(0);
 
   useEffect(() => { loadAdvice(); }, [selectedMonth]);
 
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvt, () => {
-      setKeyboardOpen(true);
+    const showSub = Keyboard.addListener(showEvt, (e) => {
+      const h = e?.endCoordinates?.height ?? 0;
+      setKbHeight(h);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     });
-    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardOpen(false));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
@@ -92,6 +94,16 @@ export default function AdviceScreen() {
   }
 
   const insights = advice?.insights || [];
+  const keyboardOpen = kbHeight > 0;
+
+  // Input bar sticks just above the keyboard on both platforms:
+  // - iOS: KeyboardAvoidingView (padding) already lifts the bar, so only add a small gutter.
+  // - Android: KeyboardAvoidingView does nothing, so pad manually by the keyboard height.
+  const baseBottom = Math.max(insets.bottom, 10);
+  const inputBarPaddingBottom =
+    Platform.OS === 'ios'
+      ? (keyboardOpen ? 8 : baseBottom)
+      : (keyboardOpen ? kbHeight + 8 : baseBottom);
 
   return (
     <KeyboardAvoidingView
@@ -99,46 +111,42 @@ export default function AdviceScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      {/* Top bar: month + insights button */}
+      <View style={styles.topBar}>
+        <View style={styles.monthBadge}>
+          <Ionicons name="calendar-outline" size={14} color={COLORS.accent} />
+          <Text style={styles.monthBadgeText}>
+            {new Date(selectedMonth + '-01').toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.insightsBtn}
+          onPress={() => setInsightsVisible(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="bulb" size={15} color={COLORS.accent} />
+          <Text style={styles.insightsBtnText}>Insights</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.accent} />
+          ) : (
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{insights.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Chat takes the full remaining space */}
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
       >
-        {/* Month badge */}
-        <TouchableOpacity style={styles.monthBadge}>
-          <Ionicons name="calendar-outline" size={14} color={COLORS.accent} />
-          <Text style={styles.monthBadgeText}>
-            {new Date(selectedMonth + '-01').toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Insights */}
-        {loading ? (
-          <Loader text="Analysing your finances..." />
-        ) : insights.length > 0 ? (
-          <>
-            <SectionHeader title="Insights" />
-            {insights.map((ins, i) => {
-              const style = INSIGHT_COLORS[ins.type] || INSIGHT_COLORS.tip;
-              return (
-                <View key={i} style={[styles.insightCard, { backgroundColor: style.bg, borderLeftColor: style.border }]}>
-                  <Ionicons name={style.iconName} size={20} color={style.border} style={{ marginTop: 2 }} />
-                  <View style={styles.insightContent}>
-                    <Text style={styles.insightTitle} numberOfLines={2} adjustsFontSizeToFit>{ins.title}</Text>
-                    <Text style={styles.insightMsg} numberOfLines={3} adjustsFontSizeToFit>{ins.message}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </>
-        ) : !advice || advice.message ? (
-          <EmptyState iconName="bulb-outline" title="No insights yet" sub="Add transactions to see financial insights." />
-        ) : null}
-
-        {/* Chat section */}
-        <SectionHeader title="Ask Pawket" />
+        {/* Chat header */}
         <View style={styles.aiBadgeRow}>
           <View style={styles.aiBadge}>
             <Text style={styles.aiBadgeText}>AI</Text>
@@ -147,6 +155,18 @@ export default function AdviceScreen() {
         </View>
 
         {/* Messages */}
+        {chatMessages.length === 0 && !chatLoading ? (
+          <View style={styles.welcomeWrap}>
+            <View style={styles.welcomeIcon}>
+              <Ionicons name="paw" size={28} color={COLORS.accent} />
+            </View>
+            <Text style={styles.welcomeTitle}>Ask Pawket anything</Text>
+            <Text style={styles.welcomeSub}>
+              Spending, saving, budgets — I answer from your transactions.
+            </Text>
+          </View>
+        ) : null}
+
         {chatMessages.map((msg, i) => (
           <View key={i} style={[styles.msgBubble, msg.role === 'user' ? styles.msgUser : styles.msgBot]}>
             {msg.role === 'bot' && (
@@ -187,8 +207,8 @@ export default function AdviceScreen() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* Input bar */}
-      <View style={[styles.inputBar, { paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 10) }]}>
+      {/* Input bar — pinned just above the keyboard */}
+      <View style={[styles.inputBar, { paddingBottom: inputBarPaddingBottom }]}>
         <View style={styles.inputWrap}>
           <TextInput
             ref={inputRef}
@@ -215,35 +235,107 @@ export default function AdviceScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Insights bottom sheet */}
+      <Modal
+        visible={insightsVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setInsightsVisible(false)}
+      >
+        <Pressable style={styles.overlay} onPress={() => setInsightsVisible(false)} />
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>
+              Insights{insights.length > 0 ? ` (${insights.length})` : ''}
+            </Text>
+            <TouchableOpacity
+              style={styles.sheetClose}
+              onPress={() => setInsightsVisible(false)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            style={styles.sheetScroll}
+            contentContainerStyle={styles.sheetScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {loading ? (
+              <Loader text="Analysing your finances..." />
+            ) : insights.length > 0 ? (
+              insights.map((ins, i) => {
+                const st = INSIGHT_COLORS[ins.type] || INSIGHT_COLORS.tip;
+                return (
+                  <View key={i} style={[styles.insightCard, { backgroundColor: st.bg, borderLeftColor: st.border }]}>
+                    <Ionicons name={st.iconName} size={20} color={st.border} style={{ marginTop: 2 }} />
+                    <View style={styles.insightContent}>
+                      <Text style={styles.insightTitle} numberOfLines={2} adjustsFontSizeToFit>{ins.title}</Text>
+                      <Text style={styles.insightMsg} numberOfLines={4} adjustsFontSizeToFit>{ins.message}</Text>
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <EmptyState iconName="bulb-outline" title="No insights yet" sub="Add transactions to see financial insights." />
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   root:   { flex: 1, backgroundColor: COLORS.bg },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 0 },
 
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8,
+  },
   monthBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: COLORS.bgCard, borderRadius: RADIUS.full,
-    paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'flex-start', marginBottom: 16,
+    paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'flex-start',
   },
   monthBadgeText: { color: COLORS.textSecondary, fontSize: 13, ...FONTS.medium },
 
-  insightCard: { flexDirection: 'row', borderRadius: RADIUS.md, borderLeftWidth: 4, padding: 14, marginBottom: 10, gap: 12 },
-  insightContent: { flex: 1 },
-  insightTitle: { color: COLORS.textPrimary, fontSize: 14, ...FONTS.bold, marginBottom: 4 },
-  insightMsg:   { color: COLORS.textSecondary, fontSize: 13, lineHeight: 18 },
+  insightsBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: COLORS.accentSoft, borderRadius: RADIUS.full,
+    borderWidth: 1, borderColor: COLORS.accent + '40',
+    paddingHorizontal: 14, paddingVertical: 8,
+  },
+  insightsBtnText: { color: COLORS.textPrimary, fontSize: 13, ...FONTS.bold },
+  countBadge: {
+    backgroundColor: COLORS.accent, borderRadius: RADIUS.full,
+    minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  countBadgeText: { color: '#fff', fontSize: 11, ...FONTS.bold },
 
-  chatSubtitle: { color: COLORS.textMuted, fontSize: 12, marginBottom: 12, marginTop: -4, flex: 1 },
+  scroll: { flex: 1 },
+  scrollContent: { padding: 16, paddingTop: 4, paddingBottom: 0, flexGrow: 1 },
 
-  aiBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, marginTop: -4 },
+  chatSubtitle: { color: COLORS.textMuted, fontSize: 12, flex: 1 },
+
+  aiBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   aiBadge: {
     backgroundColor: COLORS.accent, borderRadius: RADIUS.full,
     paddingHorizontal: 8, paddingVertical: 2,
   },
   aiBadgeText: { color: '#fff', fontSize: 10, ...FONTS.bold },
+
+  welcomeWrap: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 24 },
+  welcomeIcon: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: COLORS.bgElevated, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 12,
+  },
+  welcomeTitle: { color: COLORS.textPrimary, fontSize: 17, ...FONTS.bold, marginBottom: 6, textAlign: 'center' },
+  welcomeSub:   { color: COLORS.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 18 },
 
   msgBubble: { flexDirection: 'row', marginBottom: 10, alignItems: 'flex-end' },
   msgUser:   { justifyContent: 'flex-end' },
@@ -273,7 +365,7 @@ const styles = StyleSheet.create({
 
   inputBar: {
     backgroundColor: COLORS.bgCard, borderTopWidth: 1, borderTopColor: COLORS.border,
-    paddingHorizontal: 16, paddingVertical: 10,
+    paddingHorizontal: 16, paddingTop: 10,
   },
   inputWrap: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 10,
@@ -283,9 +375,39 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1, color: COLORS.textPrimary, fontSize: 15, ...FONTS.medium,
-    maxHeight: 100, paddingVertical: 4,
+    maxHeight: 100, minHeight: 36, paddingVertical: 6,
+    textAlignVertical: 'center',
   },
   sendBtn: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden' },
   sendBtnDisabled: { opacity: 0.4 },
   sendBtnSolid: { flex: 1, backgroundColor: COLORS.accent, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  sheet: {
+    backgroundColor: COLORS.bgSheet,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingTop: 0, maxHeight: '80%',
+  },
+  sheetHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: COLORS.borderBright,
+    alignSelf: 'center', marginTop: 12, marginBottom: 8,
+  },
+  sheetHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 12,
+  },
+  sheetTitle: { color: COLORS.textPrimary, fontSize: 18, ...FONTS.bold },
+  sheetClose: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: COLORS.bgElevated, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  sheetScroll: { maxHeight: 480 },
+  sheetScrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
+
+  insightCard: { flexDirection: 'row', borderRadius: RADIUS.md, borderLeftWidth: 4, padding: 14, marginBottom: 10, gap: 12 },
+  insightContent: { flex: 1 },
+  insightTitle: { color: COLORS.textPrimary, fontSize: 14, ...FONTS.bold, marginBottom: 4 },
+  insightMsg:   { color: COLORS.textSecondary, fontSize: 13, lineHeight: 18 },
 });
