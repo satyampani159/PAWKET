@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from datetime import datetime
 from database.database import get_db, User
 from services.analytics import get_monthly_analytics
-from services.chat_engine import get_chat_reply
+from services.chat_engine import get_chat_reply_with_meta, AI_DISCLOSURE_SHORT, PERSONA_NAME
 from routers.auth import require_auth
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=500)
     month: str | None = None
     history: list[dict] | None = None
 
@@ -28,6 +28,7 @@ async def chat_endpoint(
     db: Session = Depends(get_db),
 ):
     month = req.month or datetime.utcnow().strftime("%Y-%m")
+    message = (req.message or "").strip()[:500]
 
     try:
         analytics = get_monthly_analytics(db, month, user.id)
@@ -46,8 +47,8 @@ async def chat_endpoint(
         "financial_goal": user.financial_goal,
     }
 
-    reply = await get_chat_reply(
-        message=req.message,
+    reply, meta = await get_chat_reply_with_meta(
+        message=message,
         analytics=analytics,
         month=month,
         history=req.history or [],
@@ -55,4 +56,12 @@ async def chat_endpoint(
         prev_analytics=prev_analytics,
     )
 
-    return {"reply": reply}
+    # Backwards-compatible: mobile reads `reply`. Meta documents the 7 behaviours.
+    return {
+        "reply": reply,
+        "meta": {
+            **meta,
+            "disclosure": AI_DISCLOSURE_SHORT,
+            "persona": PERSONA_NAME,
+        },
+    }

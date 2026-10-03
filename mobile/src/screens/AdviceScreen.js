@@ -24,7 +24,12 @@ const QUICK_ACTIONS = [
   'Am I saving enough?',
   'Show my top expenses',
   'How can I cut costs?',
+  'Talk to human',
 ];
+
+// Displayed above the chat so users always know they are talking to an AI,
+// with a one-tap path to human support (Q4: disclosure + handoff).
+const AI_DISCLOSURE = 'You are chatting with Pawket AI (not a human). Say "Talk to human" anytime for human support.';
 
 export default function AdviceScreen() {
   const { selectedMonth, advice, setAdvice, chatMessages, addChatMessage } = useStore();
@@ -91,7 +96,7 @@ export default function AdviceScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <ScrollView
@@ -134,7 +139,12 @@ export default function AdviceScreen() {
 
         {/* Chat section */}
         <SectionHeader title="Ask Pawket" />
-        <Text style={styles.chatSubtitle}>Get personalized answers about your finances</Text>
+        <View style={styles.aiBadgeRow}>
+          <View style={styles.aiBadge}>
+            <Text style={styles.aiBadgeText}>AI</Text>
+          </View>
+          <Text style={styles.chatSubtitle}>{AI_DISCLOSURE}</Text>
+        </View>
 
         {/* Messages */}
         {chatMessages.map((msg, i) => (
@@ -226,7 +236,14 @@ const styles = StyleSheet.create({
   insightTitle: { color: COLORS.textPrimary, fontSize: 14, ...FONTS.bold, marginBottom: 4 },
   insightMsg:   { color: COLORS.textSecondary, fontSize: 13, lineHeight: 18 },
 
-  chatSubtitle: { color: COLORS.textMuted, fontSize: 12, marginBottom: 12, marginTop: -4 },
+  chatSubtitle: { color: COLORS.textMuted, fontSize: 12, marginBottom: 12, marginTop: -4, flex: 1 },
+
+  aiBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, marginTop: -4 },
+  aiBadge: {
+    backgroundColor: COLORS.accent, borderRadius: RADIUS.full,
+    paddingHorizontal: 8, paddingVertical: 2,
+  },
+  aiBadgeText: { color: '#fff', fontSize: 10, ...FONTS.bold },
 
   msgBubble: { flexDirection: 'row', marginBottom: 10, alignItems: 'flex-end' },
   msgUser:   { justifyContent: 'flex-end' },
